@@ -92,6 +92,10 @@ read instead of the pages.** View only the images it lists, in one batch per pap
   (`pdftoppm -r 150 -f N -l N -x -y -W -H`) to `work/view/` and add `[[figure <id> <path>]]`.
 - **full pages marked handwritten**: transcribe the page word for word into the source.
 
+Pen marks on a scan are evidence (a crossed-out answer means the key differs), not part of the
+paper: don't transcribe them; mention them in the paper's `note`. A referenced but missing exhibit
+("see Exhibit 15") is noted in `note` and in the answer; never invent its data.
+
 Wrong role or pairing guess? Re-run with `--role ID=paper|solution|reading` or `--pair SOL=PAPER`.
 Papers set the register of the bank: skim the sources of the newest paper before writing questions.
 
@@ -256,4 +260,6 @@ has, pin another.
   bank instead of `ref` (rule 4).
 - Excel formulae written in prose instead of a `calc`; a calc that "proves" nothing (no expect,
   key or option to check against).
+- Piling questions into a few units (check the coverage line and rebalance); obvious distractors;
+  explanations that just restate the right option.
 - Shipping an answer key you didn't verify; building sections the student didn't ask for.
