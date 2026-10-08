@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.calc_cache.json
+# desks built while testing go outside the repo (tests/run.sh uses a temp dir);
+# real course material never goes in this repo
+tests/out/

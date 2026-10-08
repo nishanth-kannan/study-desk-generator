@@ -1,0 +1,36 @@
+# On a version tag (v2.0, v2.1, ...): check the tag, VERSION and SKILL.md agree, run the end-to-end
+# tests, then attach study-desk.zip (the installable skill folder) to a GitHub release.
+name: release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag, VERSION and SKILL.md agree
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -e
+          test "$(cat study-desk/scripts/VERSION)" = "$GITHUB_REF_NAME" || { echo "VERSION is $(cat study-desk/scripts/VERSION), tag is $GITHUB_REF_NAME"; exit 1; }
+          grep -q -- "--branch $GITHUB_REF_NAME " study-desk/SKILL.md || { echo "SKILL.md clones a different release"; exit 1; }
+          grep -q -- "--expect $GITHUB_REF_NAME" study-desk/SKILL.md || { echo "SKILL.md expects a different version"; exit 1; }
+      - name: Install tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q poppler-utils tesseract-ocr libreoffice-calc-nogui
+          pip install -q pdfplumber pytesseract openpyxl reportlab pillow playwright
+          python -m playwright install --with-deps chromium
+      - name: End-to-end tests (synthetic fixtures)
+        run: tests/run.sh "$RUNNER_TEMP/e2e"
+      - name: Package the skill
+        run: zip -qr study-desk.zip study-desk -x '*/__pycache__/*'
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: study-desk.zip
+          generate_release_notes: true
