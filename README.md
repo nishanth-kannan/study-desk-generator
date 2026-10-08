@@ -60,7 +60,8 @@ follow your system (or toggle *Theme*).
 2. In Claude, open **Settings → Capabilities → Skills**, upload the zip, and turn the skill on.
 
 If only `SKILL.md` ends up installed (for example, saved from a chat), it still works: the first
-build step clones the matching release of this repository to get the scripts.
+build step clones the newest **v2.x** release of this repository to get the scripts, so script fixes
+reach you without reinstalling the skill.
 
 **In Claude Code:** copy the `study-desk/` folder into your skills directory
 (`~/.claude/skills/study-desk/`).
@@ -164,7 +165,7 @@ pip install pdfplumber pytesseract openpyxl pillow playwright && python -m playw
 Then, from an empty desk folder (`S` is the path to `study-desk/scripts`):
 
 ```bash
-python3 $S/check_env.py --expect v2.0                # versions match, tools present
+python3 $S/check_env.py --expect v2                  # a v2.x release, tools present
 python3 $S/ingest.py ~/papers/*.pdf ~/slides/*.pptx   # -> sources/, work/summary.txt, work/view/
 cat work/summary.txt                                 # what needs checking
 python3 $S/scaffold.py                               # -> data/papers/<id>.json
@@ -176,7 +177,7 @@ python3 $S/verify.py --compare work/compare.html --top 6 --out work/review.png
 
 | Script | Does |
 |---|---|
-| `check_env.py` | Confirms the scripts match the `SKILL.md` version; installs missing Python packages; reports missing tools. |
+| `check_env.py` | Confirms the scripts suit the `SKILL.md` (`--expect v2` for any v2.x, `--expect v2.1` exactly); installs missing Python packages; reports missing tools. |
 | `ingest.py` | Classifies uploads, writes verbatim `sources/<id>.txt`, OCRs scans, inventories tables/figures, writes `work/summary.txt` and the images worth viewing. Options: `--role ID=paper\|solution\|reading`, `--pair SOL=PAPER`. |
 | `scaffold.py` | Splits sources into question items and attaches official solutions. Re-run after editing a source; your own fields are kept. |
 | `build_desk.py` | Runs every check and the Excel recalculation, writes the desk, the workbook, `work/compare.html` and `work/build_report.txt`. Options: `--sections`, `--theme`, `--check`. |
@@ -221,13 +222,23 @@ tests/                   synthetic fixtures, scripted "Claude" edits, fault inje
 handwritten-style solutions), runs the whole pipeline, injects 16 realistic mistakes that the
 build must catch, and measures OCR accuracy. Run it before every release.
 
+**Versioning.** An installed `SKILL.md` fetches the newest release of its **major** version
+(`v2.*`), so every release must keep its major's promise:
+
+- **Minor release (v2.1, v2.2, …):** bug fixes and backward-compatible additions only. Every command,
+  option, data field and directive that a v2 `SKILL.md` mentions keeps working. Installed skills pick
+  it up automatically.
+- **Major release (v3.0):** anything that would break a v2 `SKILL.md` — renamed commands or fields,
+  a changed workflow. Ship it with a `SKILL.md` that fetches `'v3.*'` and accepts `v3.*`; installed v2
+  skills keep using the newest v2.x until they are updated.
+
 **Releasing:**
 
 1. Change the scripts and/or `SKILL.md`; run `tests/run.sh`.
-2. Bump `study-desk/scripts/VERSION` and both version references in `SKILL.md` (`--branch` and
-   `--expect`) to the new tag.
-3. Commit, then `git tag v2.1 && git push origin v2.1`. The workflow refuses a tag that disagrees with
-   `VERSION` or `SKILL.md`, runs the tests, and publishes `study-desk.zip`.
+2. Set `study-desk/scripts/VERSION` to the new tag. For a major release, also change the `v2` in
+   `SKILL.md`'s setup step (`'v2.*'` and `v2.*)`) to the new major.
+3. Commit, then `git tag v2.2 && git push origin v2.2`. The workflow refuses a tag that disagrees with
+   `VERSION` or with the major version `SKILL.md` fetches, runs the tests, and publishes `study-desk.zip`.
 
 Protect `v*` tags in the repository settings (Rules → Rulesets) so a published release can't be moved.
 

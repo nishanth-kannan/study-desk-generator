@@ -11,7 +11,7 @@ reference**. Progress is saved in the browser. Scripts do the copying, checking 
 you do the reading, judging and writing. You never hand-write the HTML, CSS or JavaScript, and
 you never retype a past paper.
 
-Tools: https://github.com/nishanth-kannan/study-desk-generator (this file expects release **v2.0**).
+Tools: https://github.com/nishanth-kannan/study-desk-generator (this file works with any **v2.x** release).
 
 ---
 
@@ -41,17 +41,21 @@ Tools: https://github.com/nishanth-kannan/study-desk-generator (this file expect
 
 ```bash
 T="<skill base directory>/scripts"
-if [ ! -f "$T/build_desk.py" ]; then
-  [ -d /tmp/study-desk-tools ] || git clone -q --depth 1 --branch v2.0 https://github.com/nishanth-kannan/study-desk-generator.git /tmp/study-desk-tools
+if [ ! -f "$T/build_desk.py" ]; then                 # only SKILL.md installed: fetch the newest v2.x release
   T=/tmp/study-desk-tools/study-desk/scripts
+  if [ ! -f "$T/build_desk.py" ]; then
+    REPO=https://github.com/nishanth-kannan/study-desk-generator.git
+    TAG=$(git ls-remote --tags --refs "$REPO" 'v2.*' | sed 's#.*refs/tags/##' | sort -V | tail -1)
+    [ -n "$TAG" ] && git -c advice.detachedHead=false clone -q --depth 1 --branch "$TAG" "$REPO" /tmp/study-desk-tools
+  fi
 fi
-python3 "$T/check_env.py" --expect v2.0
+case "$(cat "$T/VERSION" 2>/dev/null)" in v2.*) python3 "$T/check_env.py" ;; *) echo "STOP: no v2.x study-desk tools found"; false ;; esac
 ```
 
-It prints the scripts' absolute path: use that path in every later command (shell variables don't
-carry between commands). If the clone fails or the versions differ, **stop and tell the student**;
-never recreate the scripts from memory. Work in a desk folder (e.g. `./om1-desk/`) and run every
-command from it.
+It prints the tools' version and absolute path: use that path in every later command (shell
+variables don't carry between commands). If it prints STOP or the clone fails, **stop and tell the
+student**; never recreate the scripts from memory. Work in a desk folder (e.g. `./om1-desk/`) and
+run every command from it.
 
 ---
 

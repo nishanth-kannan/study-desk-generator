@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""check_env.py -- confirm these scripts match the SKILL.md that is running them, and that the tools exist.
+"""check_env.py -- confirm these scripts suit the SKILL.md that is running them, and that the tools exist.
 
-    python3 check_env.py --expect v2.0
+    python3 check_env.py                 # tools only
+    python3 check_env.py --expect v2     # any v2.x release (what SKILL.md needs)
+    python3 check_env.py --expect v2.1   # exactly v2.1 (tests, releases)
 
-Exits 1 if the version differs (a half-updated install) or a required tool is missing. Missing Python
+Exits 1 if the version doesn't match or a required tool is missing. Missing Python
 packages are installed with pip first. Missing optional tools only switch features off, and it says which.
 """
 import argparse, importlib, shutil, subprocess, sys
@@ -24,9 +26,10 @@ def has(mod):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--expect"); a = ap.parse_args()
     ver = (HERE / "VERSION").read_text().strip() if (HERE / "VERSION").exists() else "unknown"
-    if a.expect and a.expect != ver:
-        sys.exit(f"VERSION MISMATCH: SKILL.md expects tools {a.expect}, these scripts are {ver} ({HERE}). "
-                 f"Fetch the matching release instead of running these.")
+    ok = ver == a.expect or ("." not in (a.expect or "") and ver.split(".")[0] == a.expect)
+    if a.expect and not ok:
+        sys.exit(f"VERSION MISMATCH: expected tools {a.expect}{'.x' if '.' not in a.expect else ''}, these scripts are {ver} ({HERE}). "
+                 f"Fetch a matching release instead of running these.")
     missing = [m for m in PIP if not has(m)]
     if missing:
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--break-system-packages"] + [PIP[m] for m in missing],
