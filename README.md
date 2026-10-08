@@ -1,5 +1,8 @@
 # Study Desk Generator
 
+> Hello! (from a real person). This is all (obviously) AI generated slop. Please use it at your own discretion. I made this solely for my own personal use, so I can't assure it'll work for everyone. I did this to help me study for my MBA and maybe someone will find a use for this! I'll keep improving it, subject to my own requirements.
+
+
 A Claude skill that turns your course material — past papers, official solutions, readings, slides —
 into **one offline HTML revision desk**. Past papers are digitized **word for word** with their
 official solutions and a worked explanation; a practice-question bank, concept notes and a quick
