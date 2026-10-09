@@ -28,7 +28,7 @@ BASE = Path(".")
 WARN = []
 VERSION = (HERE / "VERSION").read_text().strip() if (HERE / "VERSION").exists() else "dev"
 DIFFS = {"E", "M", "H"}
-BLOCK_TYPES = {"h", "p", "list", "defs", "table", "box", "fig", "pre", "flow", "cpm", "chart", "gantt"}
+BLOCK_TYPES = {"h", "p", "list", "defs", "table", "box", "fig", "pre", "flow", "cpm", "chart", "gantt", "ex"}
 SECTION_ALIASES = {"concepts": "concepts", "concept": "concepts", "notes": "concepts", "theory": "concepts",
     "questions": "questions", "question": "questions", "quiz": "questions", "bank": "questions", "mcq": "questions", "mcqs": "questions",
     "papers": "papers", "paper": "papers", "pyq": "papers", "pyqs": "papers", "past": "papers", "past-papers": "papers",
@@ -373,7 +373,7 @@ def pick_theme(d, cli):
 
 
 # ------------------------------------------------------------------ refs: verbatim source inside bank questions
-def strip_tags(x): return re.sub(r"<[^>]+>", " ", str(x))
+def strip_tags(x): return re.sub(r"</?[A-Za-z!][^>]*>", " ", str(x))
 
 def expand_refs(d):
     idx = {}
@@ -436,9 +436,25 @@ def validate(d):
             elif it["n"] in ns: errors.append(f"{t}: duplicate n")
             ns.add(it.get("n"))
             if it.get("head"): continue
+            if it.get("parts"):
+                for k, pt in enumerate(it["parts"]):
+                    if pt.get("head"): continue
+                    pl = f"{t} ({it.get('name')} {pt.get('label') or 'part ' + str(k + 1)})"
+                    if not pt.get("e") and not it.get("e"): errors.append(f"{pl}: needs a solution -- write e_explain on the part")
+                    elif pt.pop("_needs_explain", False): errors.append(f"{pl}: has the printed key but no e_explain")
+                    if pt.get("num") is not None:
+                        nv = pt["num"] if isinstance(pt["num"], list) else [pt["num"]]
+                        if not nv or not all(isinstance(v, (int, float)) for v in nv): errors.append(f"{pl}: num must be a number or a list of numbers")
+                        continue
+                    ch = pt.get("o") or pt.get("choices")
+                    if ch:
+                        if pt.get("a") is None: errors.append(f"{pl}: answer not set -- set 'a' (zero-based)")
+                        elif not isinstance(pt.get("a"), int) or not (0 <= pt["a"] < len(ch)): errors.append(f"{pl}: answer index out of range")
+                it.pop("_needs_explain", None)
+                continue
             if not it.get("e"): errors.append(f"{t} ({it.get('name')}): needs a solution -- write e_explain")
             elif it.pop("_needs_explain", False): errors.append(f"{t} ({it.get('name')}): has the official solution but no e_explain")
-            if it.get("sub"): continue
+            if it.get("sub") or it.get("num") is not None: continue
             o = it.get("o")
             if not isinstance(o, list) or len(o) < 2: errors.append(f"{t}: needs options (or \"sub\": true)"); continue
             if it.get("a") is None: errors.append(f"{t} ({it.get('name')}): answer not set -- no key was supplied, so solve it and set 'a'")
@@ -476,7 +492,11 @@ def report(d, out):
         out.append("   difficulty  " + "  ".join(f"{k}={dc.get(k,0)} ({dc.get(k,0)/len(qs):.0%})" for k in "EMH"))
     for z in d.get("papers") or []:
         items = [i for i in z.get("qs") or [] if not i.get("head")]
-        out.append(f"   paper  {z['title'][:40]:40s} {len(items):3d} items ({sum(1 for i in items if i.get('sub'))} written)")
+        parts = [p for i in items for p in i.get("parts") or [] if not p.get("head")]
+        mcq = sum(1 for i in items if i.get("o") and not i.get("sub")) + sum(1 for p in parts if p.get("o") or p.get("choices"))
+        num = sum(1 for i in items if i.get("num") is not None) + sum(1 for p in parts if p.get("num") is not None)
+        out.append(f"   paper  {z['title'][:40]:40s} {len(items):3d} items, {len(parts)} sub-parts · {mcq} MCQ, {num} numeric, "
+                   f"{len(items) + len(parts) - sum(1 for i in items if i.get('parts')) - mcq - num} written")
 
 
 def compose(it, paper):
@@ -499,11 +519,74 @@ def compose(it, paper):
         it["e"] = f"<h5>Worked solution (no official solution was supplied)</h5>{exp or ''}{calc_html}" if (exp or calc_html) else ""
 
 
+# ------------------------------------------------------------------ past-paper examples inside concept notes
+def _answer_line(x):
+    ch = x.get("o") or x.get("choices")
+    if x.get("num") is not None:
+        v = x["num"] if isinstance(x["num"], list) else [x["num"]]
+        return "<p class='ex-key'><b>Answer:</b> " + " , ".join(f"{n:g}" for n in v) + "</p>"
+    if ch and isinstance(x.get("a"), int) and 0 <= x["a"] < len(ch):
+        return f"<p class='ex-key'><b>Answer:</b> {'ABCDEFGHIJ'[x['a']]}. {ch[x['a']]}</p>"
+    return ""
+
+
+def _opts(x):
+    ch = x.get("o") or x.get("choices")
+    return ("<ol class='ex-opts' type='A'>" + "".join(f"<li>{o}</li>" for o in ch) + "</ol>") if ch else ""
+
+
+def expand_examples(d, papers):
+    """{"t": "ex", "paper": id, "n": item n, "part": label or 1-based index?, "why": html?, "with_stem": bool?}
+    -> the verbatim past-paper question (copied from the built paper, never retyped), its answer and
+    explanation behind a toggle, and a link to practise it in Past Papers."""
+    idx = {(z["id"], it.get("n")): (z, it) for z in papers for it in z.get("qs") or []}
+    for c in d.get("concepts") or []:
+        for i, b in enumerate(c.get("blocks") or []):
+            if b.get("t") != "ex": continue
+            where = f"concept unit={c.get('unit')} block {i+1}"
+            hit = idx.get((b.get("paper"), b.get("n")))
+            if not hit: ERR.append(f"{where}: ex block points to paper {b.get('paper')!r} n={b.get('n')!r}, which is not in the desk"); continue
+            z, it = hit
+            key = f"{z['id']}-{it.get('n')}"
+            parts = it.get("parts") or []
+            pt, pk = None, key
+            if b.get("part") is not None:
+                if isinstance(b["part"], int) and 1 <= b["part"] <= len(parts): k = b["part"] - 1
+                else: k = next((j for j, p in enumerate(parts) if (p.get("label") or "").strip() == str(b["part"]).strip()), None)
+                if k is None: ERR.append(f"{where}: {it.get('name')} has no part {b['part']!r}"); continue
+                pt, pk = parts[k], f"{key}.{k}"
+            name = f"{z['title']} · {it.get('name') or 'Q' + str(it.get('n'))}" + (f" {pt.get('label')}" if pt and pt.get("label") else "")
+            h = f"<div class='ex-card'><div class='ex-head'>From the past paper · {name}</div>"
+            if b.get("why"): h += f"<p class='ex-why'>{b['why']}</p>"
+            if pt is not None:
+                if b.get("with_stem", True) and strip_tags(it.get("q", "")).strip():
+                    h += f"<details class='rx-src'><summary>Question stem (verbatim)</summary><div>{it['q']}</div></details>"
+                pre = next((p for p in parts[:parts.index(pt)][::-1] if p.get("head")), None)
+                if pre and b.get("with_stem", True):
+                    h += f"<details class='rx-src'><summary>Text before this part (verbatim)</summary><div>{pre['q']}</div></details>"
+                h += f"<div class='ex-q'>{pt.get('q', '')}</div>{_opts(pt)}"
+                ans = _answer_line(pt) + (pt.get("e") or "")
+            else:
+                h += f"<div class='ex-q'>{it.get('q', '')}</div>{_opts(it)}"
+                ans = _answer_line(it)
+                for p in parts:
+                    if p.get("head"): h += f"<div class='ex-q ex-mid'>{p.get('q', '')}</div>"; continue
+                    h += f"<div class='ex-q'>{p.get('q', '')}</div>{_opts(p)}"
+                    ans += (f"<h5>{p.get('label') or ''}</h5>" if p.get("label") else "") + _answer_line(p) + (p.get("e") or "")
+                ans += it.get("e") or ""
+            h += f"<details class='ex-ans'><summary>Show answer and explanation</summary>{ans}</details>"
+            h += f"<button class='chip ex-go' data-paper='{z['id']}' data-pkey='{pk}'>Practise it in Past Papers →</button></div>"
+            c["blocks"][i] = {"t": "p", "raw": 1, "x": h}
+
+
+
 def strip_private(d):
     for z in d.get("papers") or []:
         for k in ("source", "solution_source", "_check", "verbatim_min"): z.pop(k, None)
         for it in z.get("qs") or []:
             for k in [k for k in it if k.startswith("_") or k in ("src", "e_src", "calc")]: it.pop(k)
+            for pt in it.get("parts") or []:
+                for k in [k for k in pt if k.startswith("_") or k in ("src", "calc", "blanks")]: pt.pop(k)
     for q in d.get("questions") or []:
         for k in [k for k in q if k.startswith("_") or k == "calc"]: q.pop(k)
 
@@ -545,6 +628,9 @@ def main():
     # 2. calc
     jobs = [(f"{z['id']}-{(it.get('name') or str(it.get('n'))).replace(' ', '')}", it, f"paper {z['id']} {it.get('name') or it.get('n')}")
             for z in papers for it in z.get("qs") or [] if it.get("calc")]
+    jobs += [(f"{z['id']}-{(it.get('name') or str(it.get('n'))).replace(' ', '')}-{(pt.get('label') or str(k + 1)).strip('()')}", pt,
+              f"paper {z['id']} {it.get('name') or it.get('n')} {pt.get('label') or 'part ' + str(k + 1)}")
+             for z in papers for it in z.get("qs") or [] for k, pt in enumerate(it.get("parts") or []) if pt.get("calc")]
     jobs += [(f"bank-{q.get('id')}", q, f"question {q.get('id')}") for q in d.get("questions") or [] if q.get("calc")]
     if jobs:
         res = CALC.run(jobs, out.resolve().parent, ERR, WARN, out.stem)
@@ -553,12 +639,18 @@ def main():
     for z in papers:
         for it in z.get("qs") or []:
             if not it.get("head"): compose(it, True)
+            for pt in it.get("parts") or []:
+                if not pt.get("head"): compose(pt, True)
     for q in d.get("questions") or []: compose(q, False)
     stats = []
     for z in papers:          # papers first, so a bank "ref" copies the rendered tables too
-        for it in z.get("qs") or []: attach(it, f"paper {z.get('id')} {it.get('name') or it.get('label') or it.get('n')}", stats)
+        for it in z.get("qs") or []:
+            attach(it, f"paper {z.get('id')} {it.get('name') or it.get('label') or it.get('n')}", stats)
+            for k, pt in enumerate(it.get("parts") or []):
+                attach(pt, f"paper {z.get('id')} {it.get('name')} {pt.get('label') or 'part ' + str(k + 1)}", stats)
     expand_refs(d)
     for q in d.get("questions") or []: attach(q, f"question {q.get('id')}", stats)
+    expand_examples(d, papers)
     for c in d.get("concepts") or []:
         c["blocks"] = [({"t": "p", "raw": 1, "x": RENDER[b["t"]](b, f"concept unit={c.get('unit')} block {i+1}")}
                         if b.get("t") in RICH_IN_NOTES or (b.get("t") == "table" and b.get("groups")) else b)

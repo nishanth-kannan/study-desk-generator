@@ -5,7 +5,11 @@
   recall     every word of the item's source span is in the item; every source line is in some item
   numbers    the numbers in an item equal the numbers in its source span, as a multiset (catches 459 for 450)
   objects    every table/figure in an item's source span is shown with the item
-  official   e_official is checked the same way against the solution source
+  official   e_official is checked the same way against the solution source (a printed [[key]] against the paper)
+
+Items may carry "parts" (sub-questions with their own options / answer boxes / key): their text, tables and options
+count as the item's text, and each part's options are checked like an MCQ's. Dropdown "choices" Claude adds to a
+blank must also appear in the source.
 
 Items made by scaffold.py carry "src" (and "e_src") spans, so each check is exact and local.
 Items written by hand (no span) get the precision check and the paper-level recall check.
@@ -28,17 +32,39 @@ def has_options(it):
     return bool(it.get("o")) and not it.get("sub") and not it.get("head")
 
 
-def segments(it):
-    """The item's printed text in order, one segment per block (stem, shown text, each table row, each option)."""
-    segs = [it.get("q", "")]
-    for b in it.get("media") or []:
+def _block_segs(x):
+    segs = [x.get("q", "")]
+    for b in x.get("media") or []:
         for k in ("title", "x", "caption"):
             if isinstance(b.get(k), str): segs.append(b[k])
         if b.get("t") == "table":
             segs.append(" ".join(map(str, b.get("head") or [])))
             segs += [" ".join(map(str, r)) for r in b.get("rows") or []]
-    if has_options(it): segs += list(it.get("o") or [])
     return segs
+
+
+def segments(it):
+    """The item's printed text in order, one segment per block (stem, shown text, each table row, each option),
+    then each sub-part the same way."""
+    segs = _block_segs(it)
+    if has_options(it): segs += list(it.get("o") or [])
+    for p in it.get("parts") or []:
+        segs += _block_segs(p) + list(p.get("o") or [])
+    return segs
+
+
+def option_sets(it):
+    """(where-suffix, [options]) for the item and each part that has options or dropdown choices."""
+    out = [("", it.get("o"))] if has_options(it) else []
+    for k, p in enumerate(it.get("parts") or []):
+        lab = p.get("label") or f"part {k + 1}"
+        if p.get("o"): out.append((f" {lab}", p["o"]))
+        if p.get("choices"): out.append((f" {lab} choices", p["choices"]))
+    return out
+
+
+def all_media(it):
+    return (it.get("media") or []) + [b for p in it.get("parts") or [] for b in p.get("media") or []]
 
 
 def item_text(it):
@@ -66,7 +92,7 @@ class Source:
         self.path = Path(path)
         self.recs = read_source(path)
         self.content = content_lines(self.recs)
-        allw = [t for r in self.recs if r["kind"] in ("text", "table_row", "ignored") for t in norm(r["text"])]
+        allw = [t for r in self.recs if r["kind"] in ("text", "table_row", "ignored", "key") for t in norm(r["text"])]
         self.vocab = set(allw)
         self.grams = set(grams(allw))
         self.by_no = {r["no"]: r for r in self.recs}
@@ -159,11 +185,11 @@ def check_paper(z, base, threshold, ERR, rows, risk, IE=None):
         if score < thr:
             E.append(f"{where}: only {score:.0%} of its word sequences are in the source -- paraphrased or mis-copied. Copy it verbatim.")
         elif score < 0.995: reasons.append(f"text match {score:.0%}")
-        if not it.get("sub") and not it.get("head"):
-            for k, o in enumerate(it.get("o") or []):
+        for suf, opts in option_sets(it):
+            for k, o in enumerate(opts or []):
                 if precision(norm(o), src) < thr:
-                    E.append(f"{where}: option {'ABCDEFG'[k]} {plain(o)[:60]!r} is not in the source as printed")
-        for b in it.get("media") or []:
+                    E.append(f"{where}{suf}: option {'ABCDEFGHIJ'[k]} {plain(o)[:60]!r} is not in the source as printed")
+        for b in all_media(it):
             if b.get("t") == "table":
                 for cell in list(b.get("head") or []) + [c for r in b.get("rows") or [] for c in r]:
                     miss = [w for w in norm(cell) if w not in src.vocab]
@@ -172,7 +198,7 @@ def check_paper(z, base, threshold, ERR, rows, risk, IE=None):
         if s:
             lo, hi = s["lines"]
             span = src.span(lo, hi)
-            mcq = has_options(it)
+            mcq = has_options(it) or any(p.get("o") for p in it.get("parts") or [])
             if mcq: mcq_lines.update(r["no"] for r in span)
             stoks = [t for r in span for t in norm(line_text(r, mcq))]
             for run in uncovered_runs(stoks, toks):
@@ -181,8 +207,8 @@ def check_paper(z, base, threshold, ERR, rows, risk, IE=None):
             if miss or extra:
                 E.append(f"{where}: numbers differ from the source -- missing {miss or '[]'}, not in source {extra or '[]'}")
             tabs, figs = src.objects(lo, hi)
-            shown = {b.get("_src") for b in (it.get("media") or []) + (it.get("emedia") or [])}
-            drawn = sum(b.get("t") in ("fig", "flow", "chart", "gantt", "cpm") for b in it.get("media") or [])
+            shown = {b.get("_src") for b in all_media(it) + (it.get("emedia") or [])}
+            drawn = sum(b.get("t") in ("fig", "flow", "chart", "gantt", "cpm") for b in all_media(it))
             for t in sorted(tabs - shown):
                 E.append(f"{where}: source table {t} (lines {lo}-{hi}) is not shown with the question")
             if len(figs - shown) > drawn - len(figs & shown):
@@ -192,6 +218,10 @@ def check_paper(z, base, threshold, ERR, rows, risk, IE=None):
         elif not it.get("head"):
             reasons.append("hand-made item (no source span)")
         if it.get("o") is not None and not it.get("sub"): reasons.append("MCQ")
+        if it.get("parts"): reasons.append(f"{len(it['parts'])} sub-parts")
+        for k, p in enumerate(it.get("parts") or []):            # printed keys on sub-parts
+            if p.get("e_official") and precision(norm(p["e_official"]), src) < thr:
+                E.append(f"{where} {p.get('label') or 'part ' + str(k + 1)}: printed key is not in the source as given")
         # official solution
         if it.get("e_official"):
             otext = official_text(it)

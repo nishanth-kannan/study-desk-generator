@@ -240,6 +240,34 @@ details.rx-src summary{cursor:pointer;font-family:var(--sans);font-size:12.5px;f
 details.rx-src[open] summary{margin-bottom:6px}
 .expl h5{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:12px 0 4px}
 .expl h5:first-child{margin-top:0}
+
+/* sub-parts (a question with several answers) and numeric answer boxes */
+.q.multi .part{border-top:1px dashed var(--line-2);margin-top:14px;padding-top:14px}
+.q.multi .part:first-of-type{border-top:0;margin-top:6px}
+.q.multi .part.phead{background:var(--accent-soft);border:0;border-radius:var(--r);padding:12px 14px}
+.q.multi .part .stem{font-size:16px;margin-bottom:10px}
+.nums{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.numin{width:150px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r);padding:8px 10px;font-family:var(--mono);font-size:14px;color:var(--ink)}
+.numin.ok{border-color:var(--ok-line);background:var(--ok-soft)}
+.numin.no{border-color:var(--no-line);background:var(--no-soft)}
+.numans{font-family:var(--mono);font-size:12.5px;color:var(--ink-2)}
+.part textarea{min-height:80px;margin-bottom:10px}
+
+/* past-paper examples inside concept notes */
+.ex-card{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r);background:var(--surface);padding:14px 16px;margin:0 0 18px;max-width:74ch}
+.ex-head{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--accent-ink);font-weight:700;margin-bottom:8px}
+.ex-why{font-size:14px;color:var(--ink-2);margin:0 0 10px}
+.ex-q{font-family:var(--serif);font-size:15.5px;line-height:1.55;color:var(--ink);margin:6px 0}
+.ex-q.ex-mid{background:var(--accent-soft);border-radius:4px;padding:8px 10px}
+.ex-opts{margin:4px 0 10px;padding-left:24px;font-size:14.5px;color:var(--ink-2)}
+.ex-opts li{margin:2px 0}
+details.ex-ans{margin:10px 0;border-top:1px solid var(--line);padding-top:8px}
+details.ex-ans summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--accent-ink)}
+details.ex-ans[open] summary{margin-bottom:8px}
+details.ex-ans p,details.ex-ans li{font-size:14.3px;line-height:1.6;color:var(--ink-2)}
+.ex-key{background:var(--ok-soft);border-radius:4px;padding:6px 10px;color:var(--ink)!important}
+.ex-go{margin-top:4px}
+.flash{outline:2px solid var(--accent);outline-offset:4px;border-radius:6px}
 </style></head>
 <body>
 
@@ -404,6 +432,61 @@ function cardHTML(item,key,store,revStore,head){
     (rev!=null?'<div class="expl">'+item.e+'</div>':'')+'</article>';
 }
 
+/* ---------- sub-parts and numeric boxes ---------- */
+function numOk(v,ans,tol){
+  var x=parseFloat(String(v).replace(/,/g,'').replace(/%$/,'')); if(isNaN(x)) return false;
+  var t=(tol!=null?tol:0.005)*Math.abs(ans); return Math.abs(x-ans)<=Math.max(t,1e-9) || Math.abs(x/100-ans)<=Math.max(t,1e-9);
+}
+function partHTML(p,pk){
+  if(p.head) return '<div class="part phead"><div class="stem">'+p.q+'</div></div>';
+  var rev=S.qrev[pk]!=null, ch=p.o||p.choices, h='<div class="part" data-pk="'+pk+'">'+(p.q?'<div class="stem">'+p.q+'</div>':''), verdict='', kind;
+  if(p.num!=null){
+    kind='num'; var vals=[].concat(p.num), got=0, any=false;
+    h+='<div class="nums">'+vals.map(function(v,j){
+      var nk=pk+'.'+j, val=S.notes[nk]||'', st='';
+      if(val!=='') any=true;
+      if(rev&&val!==''){ var ok=numOk(val,v,p.tol); st=ok?' ok':' no'; if(ok) got++; }
+      return '<input class="numin'+st+'" data-nk="'+nk+'" inputmode="decimal" value="'+esc(val)+'" placeholder="Your answer"'+(rev?' disabled':'')+'>';
+    }).join('')+'</div>';
+    if(rev) verdict=!any?'<span class="verdict">Answer shown — not attempted</span>':(got===vals.length?'<span class="verdict y">Correct</span>':'<span class="verdict n">Not quite</span>')+
+      ' <span class="numans">Answer: '+vals.join(' , ')+'</span>';
+  } else if(ch){
+    kind='mcq'; h+='<div class="opts">'+optionsHTML({o:ch,a:p.a},pk,S.qsel,S.qrev)+'</div>';
+    if(rev){ var sel=S.qsel[pk]; verdict=sel==null?'<span class="verdict">Answer shown — not attempted</span>':(sel===p.a?'<span class="verdict y">Correct</span>':'<span class="verdict n">Not quite</span>'); }
+  } else {
+    kind='sub'; h+='<textarea data-nk="'+pk+'" placeholder="Draft your answer here — it is saved in this browser.">'+esc(S.notes[pk]||'')+'</textarea>';
+  }
+  var btn = rev ? (kind==='sub'?'<button class="btn ghost" data-act="hide">Hide model answer</button>':'<button class="btn ghost" data-act="reset">Try again</button>')
+                : (kind==='sub'?'<button class="btn" data-act="show">Show model answer</button>':'<button class="btn" data-act="check">Check answer</button>');
+  return h+'<div class="acts">'+btn+verdict+'</div>'+(rev&&p.e?'<div class="expl">'+p.e+'</div>':'')+'</div>';
+}
+function multiHTML(item,key,head){
+  var parts=item.parts||[{q:'',num:item.num,tol:item.tol,e:item.e}];
+  return '<article class="q multi" data-key="'+key+'">'+head+'<div class="stem">'+item.q+'</div>'+
+    parts.map(function(p,k){return partHTML(p,key+'.'+k);}).join('')+
+    (item.parts&&item.e?'<details class="rx-src"><summary>Notes on the whole question</summary><div class="expl">'+item.e+'</div></details>':'')+'</article>';
+}
+function autoParts(z){
+  var out=[];
+  z.qs.forEach(function(q){
+    if(q.head) return;
+    var key=qzKey(z.id,q.n);
+    if(q.parts) q.parts.forEach(function(p,k){ if(!p.head && (p.o||p.choices||p.num!=null)) out.push({key:key+'.'+k,p:p}); });
+    else if(q.num!=null) out.push({key:key+'.0',p:{num:q.num,tol:q.tol}});
+    else if(!q.sub) out.push({key:key,p:q});
+  });
+  return out;
+}
+function partCorrect(e){
+  var p=e.p;
+  if(p.num!=null){ var vals=[].concat(p.num); return vals.every(function(v,j){var x=S.notes[e.key+'.'+j]; return x!=null&&x!==''&&numOk(x,v,p.tol);}); }
+  return S.qsel[e.key]===p.a;
+}
+function partTried(e){
+  if(e.p.num!=null) return [].concat(e.p.num).some(function(v,j){var x=S.notes[e.key+'.'+j]; return x!=null&&x!=='';});
+  return S.qsel[e.key]!=null;
+}
+
 /* ---------- bank ---------- */
 function filtered(){
   var t=F.term.toLowerCase();
@@ -446,6 +529,9 @@ function renderBank(){
   $('#qlist').innerHTML = list.length ? list.map(function(q){return cardHTML(q,q.id,S.sel,S.rev,qhead(q));}).join('')
     : '<div class="empty">No questions match these filters. Clear a filter to see more.</div>';
   renderProg(); renderChList();
+  var allShown=list.length && list.every(function(q){return S.rev[q.id]!=null;});
+  $('#revealall').textContent = allShown ? 'Hide all shown' : 'Reveal all shown';
+  $('#revealall').setAttribute('aria-pressed', allShown?'true':'false');
 }
 function renderChList(){
   var counts={}; QB.forEach(function(q){counts[q.unit]=(counts[q.unit]||0)+1;});
@@ -505,7 +591,10 @@ if(QB.length){
       F.shuffled=ids; this.setAttribute('aria-pressed','true'); }
     renderBank();
   });
-  $('#revealall').addEventListener('click',function(){ filtered().forEach(function(q){S.rev[q.id]=1;}); save(); renderBank(); });
+  $('#revealall').addEventListener('click',function(){
+    var list=filtered(), all=list.length && list.every(function(q){return S.rev[q.id]!=null;});
+    list.forEach(function(q){ if(all) delete S.rev[q.id]; else S.rev[q.id]=1; }); save(); renderBank();
+  });
 }
 
 /* ---------- past papers ---------- */
@@ -521,11 +610,14 @@ function renderQuiz(){
   var z=PQ.find(function(x){return x.id===curQz}); if(!z) return;
   renderQzPick();
   $('#qznote').innerHTML = z.note ? '<div class="note"><b>'+z.title+'</b>'+z.note+'</div>' : '';
-  var nsub=z.qs.filter(function(q){return q.sub}).length, nq=z.qs.filter(function(q){return !q.head}).length;
-  $('#count2').textContent = nq+' questions'+(nsub?' · '+nsub+' subjective':'');
+  var nq=z.qs.filter(function(q){return !q.head}).length, auto=autoParts(z).length;
+  var nsub=z.qs.filter(function(q){return q.sub&&q.num==null&&!q.parts}).length+z.qs.reduce(function(a,q){return a+(q.parts||[]).filter(function(p){return !p.head&&!p.o&&!p.choices&&p.num==null}).length;},0);
+  $('#count2').textContent = nq+' questions · '+auto+' auto-checked answers'+(nsub?' · '+nsub+' written':'');
   $('#qzlist').innerHTML = z.qs.map(function(item){
     var key=qzKey(z.id,item.n);
     if(item.head) return '<article class="q qhead"><div class="stem">'+item.q+'</div></article>';
+    if(item.parts || item.num!=null)
+      return multiHTML(item,key,'<div class="qtop"><span class="qid">'+(item.label?item.label:(item.name||('Q'+item.n)))+'</span>'+(item.marks?'<span class="subjbadge">'+item.marks+' marks</span>':'')+'</div>');
     if(item.sub){
       var shown=S.qrev[key]!=null;
       return '<article class="q subj" data-key="'+key+'">'+
@@ -539,12 +631,22 @@ function renderQuiz(){
   }).join('');
   renderProg2(z);
 }
+function paperKeys(z){
+  var out=[];
+  z.qs.forEach(function(q){ if(q.head) return; var k=qzKey(z.id,q.n); out.push(k);
+    if(q.parts) q.parts.forEach(function(p,i){ if(!p.head) out.push(k+'.'+i); }); else if(q.num!=null) out.push(k+'.0'); });
+  return out;
+}
+function allRevealed(z){ var ks=paperKeys(z); return ks.length>0 && ks.every(function(k){return S.qrev[k]!=null;}); }
 function renderProg2(z){
-  var mcq=z.qs.filter(function(q){return !q.sub && !q.head}), att=0, cor=0;
-  mcq.forEach(function(q){var k=qzKey(z.id,q.n); if(S.qrev[k]!=null&&S.qsel[k]!=null){att++; if(S.qsel[k]===q.a)cor++;}});
+  var allr=allRevealed(z);
+  $('#revealall2').textContent = allr ? 'Hide all answers' : 'Reveal all answers';
+  $('#revealall2').setAttribute('aria-pressed', allr?'true':'false');
+  var mcq=autoParts(z), att=0, cor=0;
+  mcq.forEach(function(e){ if(S.qrev[e.key]!=null&&partTried(e)){att++; if(partCorrect(e))cor++;}});
   var pc=mcq.length?cor/mcq.length*100:0, pw=mcq.length?(att-cor)/mcq.length*100:0;
   $('#prog2').innerHTML=
-    '<div class="prog-row"><span>MCQs attempted</span><b>'+att+' / '+mcq.length+'</b></div>'+
+    '<div class="prog-row"><span>Answers checked</span><b>'+att+' / '+mcq.length+'</b></div>'+
     '<div class="bar"><i class="g" style="width:'+pc.toFixed(2)+'%"></i><i class="r" style="width:'+pw.toFixed(2)+'%"></i></div>'+
     '<div class="prog-row"><span>Correct</span><b>'+cor+(att?' ('+Math.round(cor/att*100)+'%)':'')+'</b></div>';
 }
@@ -553,10 +655,24 @@ if(PQ.length){
     var b=e.target.closest('button[data-id]'); if(!b) return; curQz=b.dataset.id; renderQuiz();
   });
   $('#qzlist').addEventListener('input',function(e){
+    if(e.target.dataset && e.target.dataset.nk){ S.notes[e.target.dataset.nk]=e.target.value; save(); return; }
     if(e.target.tagName!=='TEXTAREA') return;
     S.notes[e.target.closest('.q').dataset.key]=e.target.value; save();
   });
+  $('#qzlist').addEventListener('keydown',function(e){
+    if(e.key==='Enter' && e.target.classList.contains('numin')){ var b=e.target.closest('.part').querySelector('[data-act=check]'); if(b) b.click(); }
+  });
   $('#qzlist').addEventListener('click',function(e){
+    var part=e.target.closest('.part[data-pk]');
+    if(part){
+      var pk=part.dataset.pk, opt=e.target.closest('.opt');
+      if(opt && S.qrev[pk]==null){ S.qsel[pk]=(S.qsel[pk]===+opt.dataset.i?null:+opt.dataset.i); save(); renderQuiz(); return; }
+      var pa=e.target.closest('[data-act]'); if(!pa) return;
+      var y=window.scrollY, act2=pa.dataset.act;
+      if(act2==='check'||act2==='show') S.qrev[pk]=1;
+      else if(act2==='hide'||act2==='reset'){ delete S.qrev[pk]; if(act2==='reset'){ delete S.qsel[pk]; Object.keys(S.notes).forEach(function(k){ if(k.indexOf(pk+'.')===0) delete S.notes[k]; }); } }
+      save(); renderQuiz(); window.scrollTo(0,y); return;
+    }
     var card=e.target.closest('.q'); if(!card) return;
     var key=card.dataset.key, z=PQ.find(function(x){return x.id===curQz});
     var n=+key.slice(curQz.length+1);
@@ -570,8 +686,8 @@ if(PQ.length){
     save(); renderQuiz();
   });
   $('#revealall2').addEventListener('click',function(){
-    var z=PQ.find(function(x){return x.id===curQz});
-    z.qs.forEach(function(q){if(!q.head) S.qrev[qzKey(z.id,q.n)]=1;}); save(); renderQuiz();
+    var z=PQ.find(function(x){return x.id===curQz}), keys=paperKeys(z), all=allRevealed(z);
+    keys.forEach(function(k){ if(all) delete S.qrev[k]; else S.qrev[k]=1; }); save(); renderQuiz();
   });
 }
 
@@ -640,6 +756,15 @@ if(CO.length){
     var el=document.getElementById(b.dataset.jump); if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
   });
   $('#notesbody').addEventListener('click',function(e){
+    var go=e.target.closest('[data-paper]');
+    if(go && PQ.length){
+      curQz=go.dataset.paper; var pk=go.dataset.pkey; renderQuiz(); document.getElementById('tab-past').click();
+      setTimeout(function(){
+        var el=document.querySelector('#qzlist [data-pk="'+pk+'"]')||document.querySelector('#qzlist [data-key="'+pk+'"]');
+        if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('flash'); setTimeout(function(){el.classList.remove('flash');},1600); }
+      },60);
+      return;
+    }
     var g=e.target.closest('[data-goto]');
     if(g){ curCh=isNaN(+g.dataset.goto)?g.dataset.goto:+g.dataset.goto; renderNotes(); window.scrollTo({top:0,behavior:'instant'}); return; }
     var d=e.target.closest('[data-drill]');

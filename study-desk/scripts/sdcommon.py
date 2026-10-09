@@ -9,6 +9,13 @@ Source file format (sources/<id>.txt) -- the verbatim master copy every check co
     [[table t1]] ... [[/table]]          a table: one row per line, cells separated by TABs
     [[figure f1 view/setA-p2-f1.png]]    a figure that sits at this point on the page
     [[item]]  [[head]]  [[nobreak]]      scaffold directives Claude may insert (see scaffold.py)
+    [[part]]  [[part head]]              the next line starts a sub-part of the current question (its own answer),
+                                         or a passage between sub-parts (case text, a second table) with no answer
+    [[options]] ... [[/options]]         the printed answer choices, one option per line, in printed order;
+                                         ingest writes these where it sees radio buttons / check boxes
+    [[blank]]                            an answer box (fill-in / numeric entry) at this point
+    [[item 7]]                           start question 7 (for papers that print no "7." -- e.g. Moodle reviews)
+    [[key]] The correct answer is: …     an answer key printed with the paper (attempt reviews); not question text
 
 Everything else is text, one printed line per line.
 """
@@ -16,7 +23,8 @@ import html, json, re, unicodedata
 from pathlib import Path
 
 PAGE_RE = re.compile(r"^=== page (\d+) ===\s*$")
-DIRECTIVE_RE = re.compile(r"^\[\[(item|head|nobreak|end)\]\]\s*$")
+DIRECTIVE_RE = re.compile(r"^\[\[(item(?: \d+)?|head|nobreak|end|part|part head|options|/options|blank)\]\]\s*$")
+KEY_LINE_RE = re.compile(r"^\[\[key\]\]\s*(.*)$")
 TABLE_OPEN_RE = re.compile(r"^\[\[table (\S+)\]\]\s*$")
 FIG_RE = re.compile(r"^\[\[figure (\S+)(?: (\S+))?\]\]\s*$")
 TOKEN_RE = re.compile(r"\d+(?:[.,]\d+)*|[a-z]+")
@@ -25,7 +33,7 @@ TOKEN_RE = re.compile(r"\d+(?:[.,]\d+)*|[a-z]+")
 # ---------------------------------------------------------------- tokens
 def plain(x):
     """HTML or source markup -> plain text."""
-    x = re.sub(r"<[^>]+>", " ", str(x))
+    x = re.sub(r"</?[A-Za-z!][^>]*>", " ", str(x))   # local patch: a bare "<=" in source text is not a tag
     return html.unescape(x).replace("**", " ").replace("\t", " ")
 
 
@@ -52,11 +60,12 @@ def grams(tokens, n=3):
 # ---------------------------------------------------------------- source files
 def read_source(path):
     """Parse a source file into line records: {no, text, kind, page, table, fig}.
-    kind: text | ignored | page | directive | table_row | figure | meta | blank"""
-    recs, page, table = [], 1, None
+    kind: text | ignored | page | directive | table_row | figure | meta | blank | key
+    Text lines inside an [[options]] block carry opt=True (one printed answer choice per line)."""
+    recs, page, table, opts = [], 1, None, False
     for no, raw in enumerate(Path(path).read_text(encoding="utf-8").split("\n"), 1):
         s = raw.rstrip()
-        r = {"no": no, "text": s, "page": page, "table": None, "fig": None}
+        r = {"no": no, "text": s, "page": page, "table": None, "fig": None, "opt": False}
         if no == 1 and s.startswith("#!"): r["kind"] = "meta"
         elif PAGE_RE.match(s): page = int(PAGE_RE.match(s).group(1)); r["page"] = page; r["kind"] = "page"
         elif s.startswith("#~"): r["kind"] = "ignored"
@@ -64,9 +73,13 @@ def read_source(path):
         elif s == "[[/table]]": r["kind"] = "directive"; r["table"] = table; table = None
         elif table: r["kind"] = "table_row"; r["table"] = table
         elif FIG_RE.match(s): m = FIG_RE.match(s); r["kind"] = "figure"; r["fig"] = {"id": m.group(1), "src": m.group(2)}
-        elif DIRECTIVE_RE.match(s): r["kind"] = "directive"
+        elif KEY_LINE_RE.match(s): r["kind"] = "key"; r["text"] = KEY_LINE_RE.match(s).group(1)
+        elif DIRECTIVE_RE.match(s):
+            r["kind"] = "directive"
+            if s.startswith("[[options]]"): opts = True
+            elif s.startswith("[[/options]]") or s.startswith("[[item]]") or s.startswith("[[part"): opts = False
         elif not s.strip(): r["kind"] = "blank"
-        else: r["kind"] = "text"
+        else: r["kind"] = "text"; r["opt"] = opts
         recs.append(r)
     return recs
 

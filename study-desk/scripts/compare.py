@@ -12,7 +12,8 @@ from sdcommon import read_source
 WEIGHTS = {"error": 10, "OCR corrected": 4, "handwritten source": 4, "scanned source": 3, "official solution from a scan": 3,
            "hand-made item (no source span)": 3, "table": 2, "figure": 1, "MCQ": 0.5}
 
-CSS = """body{font:15px/1.5 system-ui,sans-serif;margin:0;background:#f4f5f7;color:#1d2330}
+CSS = """.part{border-top:1px dashed #bbb;margin-top:8px;padding-top:6px}.key{font-weight:600}.blank{color:#777;font-style:italic}
+body{font:15px/1.5 system-ui,sans-serif;margin:0;background:#f4f5f7;color:#1d2330}
 header{padding:16px;background:#fff;border-bottom:1px solid #dde}h1{font-size:18px;margin:0 0 4px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#fff;margin:12px;padding:12px;border:1px solid #dde;border-radius:6px}
 .row h2{grid-column:1/-1;font-size:15px;margin:0}.chip{display:inline-block;font-size:12px;padding:1px 7px;margin:0 4px 0 0;border-radius:9px;background:#eef}
@@ -123,6 +124,12 @@ def build(papers, base, risk, item_errors, out_path):
         opts = "<ol type='A'>" + "".join(f"<li>{o}</li>" for o in it.get("o") or []) + "</ol>" if it.get("o") and not it.get("sub") else ""
         left = "<div class='lab'>Original</div>" + ("".join(f"<img src='{c}'>" for c in orig) or "<p><em>no source crop</em></p>")
         right = f"<div class='lab'>Digitized</div>{it.get('q', '')}{opts}"
+        for pt in it.get("parts") or []:
+            po = pt.get("o") or pt.get("choices")
+            right += (f"<div class='part'>{pt.get('q', '')}" +
+                      ("<ol type='A'>" + "".join(f"<li{' class=key' if i == pt.get('a') else ''}>{o}</li>" for i, o in enumerate(po)) + "</ol>" if po else "") +
+                      (f"<p class='blank'>[answer box{'es' if (pt.get('blanks') or 1) > 1 else ''}]</p>" if not po and not pt.get("head") else "") +
+                      (f"<p class='key'>Printed key: {pt['_official_html']}</p>" if pt.get("_official_html") else "") + "</div>")
         if sol or it.get("_official_html"):
             left += "<div class='lab'>Official solution (original)</div>" + "".join(f"<img src='{c}'>" for c in sol)
             right += f"<div class='lab'>Official solution (digitized)</div>{it.get('_official_html', '')}"

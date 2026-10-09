@@ -11,7 +11,7 @@ reference**. Progress is saved in the browser. Scripts do the copying, checking 
 you do the reading, judging and writing. You never hand-write the HTML, CSS or JavaScript, and
 you never retype a past paper.
 
-Tools: https://github.com/nishanth-kannan/study-desk-generator (this file works with any **v2.x** release).
+Tools: https://github.com/nishanth-kannan/study-desk-generator (this file needs **v2 or later** in the v2 line).
 
 ---
 
@@ -22,6 +22,10 @@ Tools: https://github.com/nishanth-kannan/study-desk-generator (this file works 
    printed answer hint ("Ans: …"), in the printed structure and order. A shortened or "cleaned up"
    question is a violation. The only allowed changes are layout and fixing OCR mistakes by reading
    the page image. The scripts copy the text for you; the build fails if anything differs.
+   **The answer format is part of the question.** A question printed with choices (lettered or not,
+   radio buttons, True / False, a drop-down) stays a choice question; a numeric entry box stays a
+   numeric box; a question with several separately answered sub-parts keeps one answer per sub-part.
+   Never collapse a choice or numeric question into a written answer box.
 2. **The Past Papers section only digitizes and solves.** Each question shows the verbatim question,
    then the **official solution as supplied** (handwritten sheets included) when one exists, then
    your explanation (concepts, working, Excel formulae). You may add your own take in the
@@ -41,21 +45,23 @@ Tools: https://github.com/nishanth-kannan/study-desk-generator (this file works 
 
 ```bash
 T="<skill base directory>/scripts"
-if [ ! -f "$T/build_desk.py" ]; then                 # only SKILL.md installed: fetch the newest v2.x release
+ok() { case "$(cat "$1/VERSION" 2>/dev/null)" in v2.0|v2.1|v2.2|v2.0.*|v2.1.*|v2.2.*) false ;; v2.*) true ;; *) false ;; esac; }
+if ! ok "$T"; then                                   # bundled tools missing or older than v2.x: fetch the newest v2.x release
   T=/tmp/study-desk-tools/study-desk/scripts
-  if [ ! -f "$T/build_desk.py" ]; then
+  if ! ok "$T"; then
+    rm -rf /tmp/study-desk-tools
     REPO=https://github.com/nishanth-kannan/study-desk-generator.git
     TAG=$(git ls-remote --tags --refs "$REPO" 'v2.*' | sed 's#.*refs/tags/##' | sort -V | tail -1)
     [ -n "$TAG" ] && git -c advice.detachedHead=false clone -q --depth 1 --branch "$TAG" "$REPO" /tmp/study-desk-tools
   fi
 fi
-case "$(cat "$T/VERSION" 2>/dev/null)" in v2.*) python3 "$T/check_env.py" ;; *) echo "STOP: no v2.x study-desk tools found"; false ;; esac
+if ok "$T"; then python3 "$T/check_env.py"; else echo "STOP: study-desk tools v2.x+ not found"; false; fi
 ```
 
 It prints the tools' version and absolute path: use that path in every later command (shell
 variables don't carry between commands). If it prints STOP or the clone fails, **stop and tell the
-student**; never recreate the scripts from memory. Work in a desk folder (e.g. `./om1-desk/`) and
-run every command from it.
+student** (v2.x must be released in the repo); never recreate the scripts from memory. Work in a
+desk folder (e.g. `./om1-desk/`) and run every command from it.
 
 ---
 
@@ -96,6 +102,22 @@ read instead of the pages.** View only the images it lists, in one batch per pap
   (`pdftoppm -r 150 -f N -l N -x -y -W -H`) to `work/view/` and add `[[figure <id> <path>]]`.
 - **full pages marked handwritten**: transcribe the page word for word into the source.
 
+**Answer formats.** Ingest reads them off the page and writes them into the source:
+
+| On the page | In the source | Desk shows |
+|---|---|---|
+| radio buttons / check boxes next to choices (lettered or not; side-by-side rows are split) | `[[options]]` … `[[/options]]`, one option per line | clickable MCQ |
+| an answer box (typed entry, drop-down) | `[[blank]]` (a typed entry is kept as `#~ [entry] …`) | numeric box, choices or written answer (step 3) |
+| a printed key, e.g. "The correct answer is: …" | `[[key]] The correct answer is: …` | official solution; sets the MCQ answer |
+
+**Attempt reviews** (Moodle and similar printouts) are recognised: the left status column becomes
+`[[item N]]` plus an ignored line (`#~ Question 4 · Partially correct · Mark 12.60 out of 15.00`);
+"Mark x out of y", the typed entries, the selected-option dots and the course navigation are
+ignored lines; the attempt summary on page 1 (status, times, grade) is evidence, so mark it `#~`.
+For lettered (A)–(D) options on typed papers nothing changes: scaffold splits them as before. When
+ingest misses choices (a scan, a list printed without buttons), wrap them yourself in
+`[[options]]` … `[[/options]]`, one per line, words untouched.
+
 Pen marks on a scan are evidence (a crossed-out answer means the key differs), not part of the
 paper: don't transcribe them; mention them in the paper's `note`. A referenced but missing exhibit
 ("see Exhibit 15") is noted in `note` and in the answer; never invent its data.
@@ -118,24 +140,42 @@ lists what needs you:
   The build refuses unconfirmed guesses.
 - **Structure wrong** (a question split in two, a heading glued to a question)? Don't edit the
   JSON text; add a directive line to the source and re-run. Your fields survive re-runs.
-  `[[item]]` next line starts a question · `[[head]]` next line starts a heading block ·
-  `[[nobreak]]` next line is not a new question · `[[end]]` close the current item.
+  `[[item]]` / `[[item 7]]` next line starts a question (numbered 7) · `[[head]]` next line starts
+  a heading block · `[[nobreak]]` next line is not a new question · `[[end]]` close the current item ·
+  `[[part]]` next line starts a sub-part with its own answer · `[[part head]]` next line starts a
+  passage between sub-parts (a new case, a second table) · `[[options]]`…`[[/options]]` the choices ·
+  `[[blank]]` an answer box.
+- **Item types come from the answer slots** (`[[options]]` blocks and `[[blank]]`s): one options
+  block → MCQ; blanks only → an answer box; **two or more slots → `parts`**, one per answer, each
+  with its label, text, options or boxes and printed key; the stem before the first labelled
+  sub-part stays on the item; text between sub-parts becomes a `head` part. An automatic split is a
+  `_check`: compare the cuts with the page, move them with `[[part]]` lines if needed.
 - **Lower-case (a)–(d) read as options** but they are sub-parts: set `"sub": true`, re-run.
-- **"answer needed"**: no key was supplied; solve it and set `a` (zero-based).
+- **"answer needed"**: no key was supplied; solve it and set `a` (zero-based) — on the item, or on
+  the part (`parts[k].a`).
+- **Answer boxes** (`"sub": true` with `"blanks": n`) are written answers until you say otherwise.
+  A numeric box gets `"num"` (a number, or a list for several boxes such as the two ends of an
+  interval) and optional `"tol"` (relative, default 0.005); delete `"sub"`. A drop-down whose
+  choices are named in the question text gets `"choices": [...]` and `"a"` (every choice must be in
+  the source). Leave `sub` only for genuinely written answers.
 
 ### 3. Write the solutions (section `papers`)
 
-For each question item add, with small Edit-tool edits to `data/papers/<id>.json`:
+For each question item — and for each sub-part in `parts` — add, with small Edit-tool edits to
+`data/papers/<id>.json`:
 
 - **`e_explain`** (always): the concept, the working, and why the tempting wrong answer is wrong.
   The build shows `Official solution (as supplied)` then `Explanation`, or `Worked solution (no
   official solution was supplied)`.
 - **`calc`** for anything quantitative (see *calc*). The build turns it into the Excel formulae
-  table, recalculates it in LibreOffice, and checks it against the key, the correct option or the
-  numbers in `e_official`. Don't write Excel formulae in prose.
+  table, recalculates it in LibreOffice, and checks it against `expect`, the `num` answer, the
+  correct option or the numbers in `e_official`. Don't write Excel formulae in prose. Excel 2010+
+  names (NORM.INV, T.DIST.2T, BINOM.DIST…) are fine: the tools add the `_xlfn.` prefix the file needs.
 - If the official key is wrong, say so in `<span class='warn'>` in `e_explain`, and give the calc a
   `"dispute"`. When the solution sheet skips questions, solve them; the `note` already says which.
 - Rename `name` if the paper calls a question something else ("Problem 4", "Question II · 3").
+- Multi-part questions: each answerable part needs its own `e_explain` (and `calc` where it
+  computes); an item-level `e_explain` is optional and shows as notes on the whole question.
 
 ### 4. Concept notes (section `concepts`) — `data/concepts/<unit>.json`
 
@@ -144,6 +184,16 @@ terms, `table` for real comparisons, `list` for ordered enumerations, `p` for ar
 for memory hooks. Write headings as claims ("Parallel ≠ always add — the croissant trap").
 Reproduce the reading's canonical examples. End each unit with a box titled *In the exam* naming
 the recurring question shapes. Figures come from the readings or official solutions.
+
+**Past-paper examples (when papers are in the desk).** Under each section a past paper tests, add
+`{"t": "ex", "paper": "<id>", "n": <n>, "part": "g)", "why": "<one line: what this shows>"}`
+right after the explanation it illustrates (`part`: a sub-part label or 1-based index; omit it for
+a whole question; `"with_stem": false` hides the shared stem). The build copies the question
+verbatim from the built paper — stem and earlier passage in collapsible boxes, options listed —
+puts the answer, explanation and Excel working behind *Show answer*, and adds a *Practise it in
+Past Papers* link that jumps to that item. Never retype a question into the notes; never add an
+example the paper doesn't support. Aim for every exam-tested idea to have one, and every paper
+question to appear under at least one section.
 
 ### 5. The question bank (section `questions`) — `data/bank/<unit>.json`
 
@@ -168,8 +218,10 @@ python3 <tools>/verify.py --compare work/compare.html --top 6 --out work/review.
 ```
 
 The build checks every paper item against its source — precision, **recall** (nothing left out),
-**numbers** (as a multiset: catches 459 for 450), tables and figures shown, official solutions —
-runs the calcs, and prints errors plus a short summary (full report: `work/build_report.txt`).
+**numbers** (as a multiset: catches 459 for 450), tables and figures shown, every option and printed
+key, official solutions — runs the calcs, and prints errors plus a short summary (full report:
+`work/build_report.txt`, with each paper's count of MCQ, numeric and written answers: a paper full
+of choices that reports 0 MCQ is a red flag).
 Fix the transcription, never the threshold. It also writes `work/compare.html`: each original
 crop beside its digitized item, **riskiest first** (OCR-corrected, scanned, tables, imperfect
 matches). View the `review-*.png` screenshots of the top rows; fix what's off and rebuild.
@@ -180,8 +232,11 @@ matches). View the `review-*.png` screenshots of the top rows; fix what's off an
 python3 <tools>/verify.py "<Course> Study Desk.html"
 ```
 
-Checks every tab renders, Check answer works, every paper renders, no JS errors, no sideways
-scroll at 400 px in dark mode. Deliver the HTML and `<Course> Study Desk - Excel workings.xlsx`.
+Checks every tab renders, Check answer works (bank and past papers, sub-parts included), Reveal
+all toggles back to Hide all, example links open Past Papers, every paper renders, no JS errors,
+no sideways scroll at 400 px in dark mode. (The bank's *Reveal all shown* toggles the same way.)
+Deliver the HTML and
+`<Course> Study Desk - Excel workings.xlsx`.
 Say what's in each tab, which sections were left out, the theme, which official solutions were
 missing, any disputed keys, and that `work/compare.html` lets the student check the digitization.
 
@@ -212,8 +267,11 @@ missing, any disputed keys, and that `work/compare.html` lets the student check 
 - `meta`: `title`, `subtitle`, `unitLabel`, `storageKey` (unique per course), optional `theme`.
   `guide`: `intro`, `frameworks: [{h, x}]`, `traps: [{h, x}]`, `sources`.
 - `a` is **zero-based**. Bank `id`s are unique. Every `unit` must be declared.
-- Paper items: `sub: true` = written answer; otherwise `o`/`a`. `head: true` = printed text with no
-  answer. Fields starting `_`, and `src`/`e_src`, belong to the scripts: leave them alone.
+- Paper items: `o`/`a` = MCQ; `num` (+`tol`) = numeric box(es); `sub: true` = written answer;
+  `head: true` = printed text with no answer; `parts: [...]` = sub-parts, each with `label`, `q`,
+  `media`, and one of `o`/`a`, `choices`/`a`, `num`/`tol` or `sub`, plus `e_official` (printed key),
+  `e_explain`, `calc`; a part with `head: true` is a passage between sub-parts. Fields starting `_`,
+  and `src`/`e_src`/`blanks`, belong to the scripts: leave them alone.
 - Text fields take inline HTML: `<b> <em> <code> <br> <sub> <sup> <ul>/<ol>/<li> <h4>`;
   `<span class='fx'>` for a formula, `<span class='warn'>` for a caveat or disputed key,
   `<b class='ans'>` for printed answer hints (blurred in bank refs), `<h5>` for sub-headings.
@@ -227,7 +285,7 @@ missing, any disputed keys, and that `work/compare.html` lets the student check 
 ```
 
 Row *i* is cell B*i* (label in A). `answer`: labels or 1-based rows (default: last row). Checked
-against `expect`, else the correct MCQ option's number, else the numbers in `e_official`
+against `expect`, else the `num` answer, else the correct MCQ option's number, else the numbers in `e_official`
 (tolerance `tol`, default 0.5%; percentages match either 0.417 or 41.7). A disagreement with the
 official solution fails the build unless `"dispute": "<why the key is wrong>"`, which the desk
 shows as a caveat.
@@ -244,6 +302,7 @@ shows as a caveat.
 | `gantt` | `rows=[{label, bars: [[start, end, text?, alt?]]}]`, `ticks`, `xlabel` |
 | `fig` | an image from the material: `src` (path relative to the desk, or data URI) or `svg` |
 | `pre` | monospace listing: `x` |
+| `ex` | (concept notes only) a past-paper example: `paper`, `n`, optional `part`, `why`, `with_stem` |
 
 Everything follows the desk's theme in light and dark mode and scrolls sideways on phones.
 
@@ -257,6 +316,9 @@ has, pin another.
 ## Common failure modes
 
 - Retyping or "tidying" a past-paper question instead of fixing the source and re-running scaffold.
+- **Turning a choice or numeric question into a written answer box** (missed `[[options]]`, a
+  Moodle MCQ shown as "Subjective", sub-parts a)–o) lumped into one textarea). Check the build's
+  MCQ / numeric / written counts against the paper.
 - Viewing every page instead of what `summary.txt` lists; dumping whole files into the context.
 - Deleting a `_check` without looking.
 - Fixing an OCR line from memory instead of the strip; editing `*.ocr.txt`.
@@ -266,4 +328,6 @@ has, pin another.
   key or option to check against).
 - Piling questions into a few units (check the coverage line and rebalance); obvious distractors;
   explanations that just restate the right option.
+- Concept notes with no past-paper examples when papers are in the desk, or examples typed into a
+  `p` block instead of an `ex` block.
 - Shipping an answer key you didn't verify; building sections the student didn't ask for.

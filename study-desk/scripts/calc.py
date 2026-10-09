@@ -9,7 +9,7 @@
              "dispute": "The key's 459 is a misprint for 450."}   # only when the official solution disagrees
 
 Row i is cell B<i>; column A holds the label. What each answer is checked against, in order:
-  expect (if given)  ->  the correct MCQ option's number  ->  the numbers in e_official.
+  expect (if given)  ->  "num" (a numeric answer box)  ->  the correct MCQ option's number  ->  the numbers in e_official.
 With none of these the working is shown but nothing is proven (a warning says so).
 A mismatch with e_official fails the build unless "dispute" explains it; the dispute is shown in
 the explanation as a visible caveat.
@@ -68,6 +68,8 @@ def recalc(jobs, xlsx_out, cache_file, WARN):
         ws = wb.create_sheet(sheet)
         ws.column_dimensions["A"].width = 34; ws.column_dimensions["B"].width = 18
         for i, (label, val) in enumerate(rows, 1):
+            if isinstance(val, str) and val.startswith("="):   # local patch: Excel 2010+ names (NORM.INV...) need _xlfn. in the file
+                val = re.sub(r"(?<![\w.])([A-Z]+(?:\.[A-Z0-9]+)+)\(", r"_xlfn.\1(", val)
             ws.cell(i, 1, str(label)); ws.cell(i, 2, val)
     need = [s for s, rows in jobs if h(rows) not in cache]
     out = {}
@@ -134,9 +136,11 @@ def run(items, out_dir, ERR, WARN, stem):
         exp = calc.get("expect")
         exp = exp if isinstance(exp, list) else ([exp] if exp is not None else None)
         source = "expect"
+        if exp is None and it.get("num") is not None:
+            exp, source = (it["num"] if isinstance(it["num"], list) else [it["num"]]), "the numeric answer"
         if exp is None and it.get("o") and isinstance(it.get("a"), int) and not it.get("sub"):
-            n = numbers(it["o"][it["a"]])
-            if n: exp, source = [_num(n[0])], "the correct option"
+            n = re.findall(r"[-\u2212]?\d[\d,]*(?:\.\d+)?", plain(it["o"][it["a"]]))    # keep the sign: -0.25 is not 0.25
+            if n: exp, source = [_num(n[0].replace("\u2212", "-"))], "the correct option"
         if exp is not None and len(exp) != len(ans):
             ERR.append(f"{where}: calc has {len(ans)} answer rows but {len(exp)} expected values"); continue
         for j, r in enumerate(ans):

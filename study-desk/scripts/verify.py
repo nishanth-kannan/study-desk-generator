@@ -39,9 +39,27 @@ def desk(path):
                 if tab.get_attribute("data-view") == "past":
                     for btn in pg.locator("#qzpick button").all():
                         btn.click(); pg.wait_for_timeout(100)
+                        opt = pg.locator("#qzlist .part .opt, #qzlist article:not(.subj):not(.qhead):not(.multi) .opt").first
+                        if opt.count():                     # an auto-checked answer (MCQ or sub-part) reveals its explanation
+                            opt.click(); pg.wait_for_timeout(80)
+                            host = pg.locator("#qzlist [data-act=check]").first
+                            if host.count(): host.click(); pg.wait_for_timeout(100)
+                            if not pg.locator("#qzlist .expl").count(): fails.append(f"paper {btn.inner_text()[:30]}: Check answer showed no explanation")
                         pg.click("#revealall2"); pg.wait_for_timeout(100)
                         if pg.locator("#qzlist article").count() == 0: fails.append(f"paper {btn.inner_text()[:30]} rendered nothing")
+                        first = pg.inner_text("#revealall2")
+                        pg.click("#revealall2"); pg.wait_for_timeout(80)          # the button toggles reveal / hide
+                        if pg.inner_text("#revealall2") == first: fails.append(f"paper {btn.inner_text()[:30]}: Reveal all does not toggle back")
+                        pg.click("#revealall2"); pg.wait_for_timeout(80)
                         figs = max(figs, pg.locator("#qzlist figure.rx").count())
+                if tab.get_attribute("data-view") == "notes":           # past-paper examples link into Past Papers
+                    for u in pg.locator("#nchlist button").all():
+                        u.click(); pg.wait_for_timeout(60)
+                        if pg.locator("#notesbody .ex-go").count():
+                            pg.locator("#notesbody .ex-go").first.click(); pg.wait_for_timeout(250)
+                            if pg.locator("#view-past").is_hidden(): fails.append("an example's 'Practise it' link did not open Past Papers")
+                            tab.click(); pg.wait_for_timeout(80)
+                            break
                 sw = pg.evaluate("document.documentElement.scrollWidth")
                 if sw > width + 1: fails.append(f"[{scheme} {width}px] sideways scroll on {label} ({sw}px)")
             if errs: fails.append(f"JavaScript errors ({scheme}): {errs[:3]}")

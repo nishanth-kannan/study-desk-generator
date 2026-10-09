@@ -77,7 +77,7 @@ def styled(words):
     runs = []
     for w in words:
         k = kind(w)
-        glued = prev is not None and w["x0"] - prev["x1"] < 0.8
+        glued = prev is not None and 0 <= w["x0"] - prev["x1"] < 0.8 and abs(w["top"] - prev["top"]) < 4   # a wrapped line restarts left: not glued
         if runs and runs[-1][0] == k:
             runs[-1][1].append(("" if glued else " ") + w["text"])
         else:
@@ -91,6 +91,111 @@ def styled(words):
 def inside(w, box, pad=1.5):
     x0, top, x1, bottom = box
     return w["x0"] >= x0 - pad and w["x1"] <= x1 + pad and w["top"] >= top - pad and w["bottom"] <= bottom + pad
+
+
+PUA_RE = re.compile(r"[\ue000-\uf8ff]")          # icon-font glyphs (tick / cross marks): not text
+
+
+def radio_marks(pg):
+    """Radio buttons and check boxes: small square-ish curves/rects (6-13 pt). Returns ([(x0, top, x1, bottom, selected)], ids).
+    A smaller filled shape inside one marks the option the candidate selected (attempt reviews)."""
+    objs = list(pg.curves) + list(pg.rects)
+    small = [o for o in objs if 6 <= o["x1"] - o["x0"] <= 13 and 6 <= o["bottom"] - o["top"] <= 13
+             and abs((o["x1"] - o["x0"]) - (o["bottom"] - o["top"])) < 1.6]
+    dots = [o for o in objs if 3 <= o["x1"] - o["x0"] < 6 and abs((o["x1"] - o["x0"]) - (o["bottom"] - o["top"])) < 1.2]
+    marks = []
+    for o in sorted(small, key=lambda o: (round(o["top"]), o["x0"])):
+        if any(abs(o["x0"] - m[0]) < 2.5 and abs(o["top"] - m[1]) < 2.5 for m in marks): continue
+        sel = any(d["x0"] > o["x0"] and d["x1"] < o["x1"] and d["top"] > o["top"] and d["bottom"] < o["bottom"] for d in dots)
+        marks.append((o["x0"], o["top"], o["x1"], o["bottom"], sel))
+    return marks
+
+
+def option_lines(lines, marks):
+    """Split lines that carry radio buttons into one line per option (a row of side-by-side options becomes
+    several lines; words are untouched), and join a wrapped option's continuation line onto it."""
+    out, last = [], None
+    for ln in lines:
+        mid = (ln["top"] + ln["bottom"]) / 2
+        row = sorted([m for m in marks if m[1] - 3 <= mid <= m[3] + 3 and m[0] < ln["x1"] and m[2] > ln["x0"] - 18], key=lambda m: m[0])
+        if row:
+            lead = [w for w in ln["words"] if w["x1"] <= row[0][2] - 1]
+            if lead: out.append(dict(ln, words=lead, x1=max(w["x1"] for w in lead)))
+            for k, m in enumerate(row):
+                nxt = row[k + 1][0] if k + 1 < len(row) else 1e9
+                ws = [w for w in ln["words"] if w["x0"] >= m[2] - 1 and w["x0"] < nxt]
+                if not ws: continue
+                o = {"top": ln["top"], "bottom": ln["bottom"], "x0": ws[0]["x0"], "x1": max(w["x1"] for w in ws), "words": ws,
+                     "opt": True, "selected": m[4], "order": ln.get("order"), "solo": len(row) == 1}
+                out.append(o)
+            last = out[-1] if out and out[-1].get("opt") else None
+            continue
+        if (last and last["solo"] and abs(ln["x0"] - last["x0"]) < 3 and ln["top"] - last["bottom"] < (last["bottom"] - last["top"]) * 1.2):
+            last["words"] = last["words"] + ln["words"]; last["x1"] = max(last["x1"], ln["x1"]); last["bottom"] = ln["bottom"]
+            continue
+        last = None
+        out.append(ln)
+    return out
+
+
+def merge_small(lines):
+    """Superscripts/subscripts (smaller type, raised or lowered) land on a line of their own; put them back in
+    their line at their x position (sigma2, X1, R2). Text order is unchanged."""
+    sizes = [w.get("size", 0) for ln in lines for w in ln["words"] if w.get("size")]
+    if not sizes: return lines
+    med = statistics.median(sizes)
+    out = []
+    for ln in lines:
+        small = all(w.get("size", med) < 0.85 * med for w in ln["words"]) and len(ln["words"]) <= 3
+        host = None
+        if small:
+            for o in lines:
+                if o is ln or any(w.get("size", med) < 0.85 * med for w in o["words"]): continue
+                if abs((o["top"] + o["bottom"]) / 2 - (ln["top"] + ln["bottom"]) / 2) <= 7 and o["x0"] <= ln["x0"] <= o["x1"] + 2:
+                    host = o; break
+        if host is None: out.append(ln); continue
+        ws = list(host["words"])
+        for sw in ln["words"]:
+            inner = next((w for w in ws if w["x0"] < sw["x0"] < w["x1"] - 0.5 and w.get("chars")), None)
+            if inner:                                   # "(X," with a subscript 1 after the X -> "(X1,"
+                k = next((i for i, c in enumerate(inner["chars"]) if c["x0"] >= sw["x0"] - 0.5), len(inner["chars"]))
+                inner["text"] = inner["text"][:k] + sw["text"] + inner["text"][k:]
+            else:
+                ws.append(dict(sw, top=host["top"]))
+        host["words"] = sorted(ws, key=lambda w: w["x0"])
+        host["x1"] = max(host["x1"], ln["x1"])
+    return out
+
+
+def entry_boxes(pg, words, marks):
+    """Answer fields in an attempt review (typed entries, drop-downs): a framed box 18-34 pt tall holding 0-4 words,
+    not a table cell."""
+    boxes, tabs = [], [t.bbox for t in pg.find_tables() if len(t.rows) >= 2 and max(len(r.cells) for r in t.rows) >= 2]
+    for o in list(pg.curves) + list(pg.rects):
+        w, h = o["x1"] - o["x0"], o["bottom"] - o["top"]
+        if not (18 <= h <= 34 and 30 <= w <= 320): continue
+        b = (o["x0"], o["top"], o["x1"], o["bottom"])
+        if any(abs(b[0] - c[0]) < 3 and abs(b[1] - c[1]) < 3 for c in boxes): continue
+        if any(b[0] >= t[0] - 2 and b[2] <= t[2] + 2 and b[1] >= t[1] - 2 and b[3] <= t[3] + 2 for t in tabs): continue
+        inn = [x for x in words if inside(x, b, 2)]
+        if len(inn) > 4 or any(m[0] >= b[0] - 1 and m[2] <= b[2] + 1 and m[1] >= b[1] - 1 and m[3] <= b[3] + 1 for m in marks): continue
+        boxes.append(b)
+    return boxes
+
+
+QBOX_RE = re.compile(r"^Question\s+(\d+)$")
+FEED_MARK_RE = re.compile(r"^Mark\s+-?[\d.]+\s+out\s+of\s+[\d.]+$")
+KEY_RE = re.compile(r"^The correct answers? (?:is|are)\s*:", re.I)
+
+
+def margin_column(words, W):
+    """Attempt reviews put a status box (Question N / Correct / Mark x out of y) in a left margin column.
+    Returns the x that separates it from the question text, or None."""
+    q = [w for w in words if w["text"] == "Question" and w["x0"] < 0.3 * W]
+    if not q: return None
+    edge = max(w["x1"] for w in q) + 20
+    right = [w["x0"] for w in words if w["x0"] > edge and w["x0"] < 0.5 * W]
+    return (min(right) - 2) if right else None
 
 
 def cluster(boxes, gap=12):
@@ -142,9 +247,43 @@ def gappy(line, factor=2.6):
 def typed_page(pg, n):
     """Return (segments, info) for a page with a text layer. Segments are in reading order."""
     W, H = float(pg.width), float(pg.height)
-    words = pg.extract_words(extra_attrs=["fontname"], keep_blank_chars=False, use_text_flow=False)
+    words = pg.extract_words(extra_attrs=["fontname", "size", "non_stroking_color"], keep_blank_chars=False, use_text_flow=False,
+                             return_chars=True)
+    words = [dict(w, text=PUA_RE.sub("", w["text"])) for w in words if PUA_RE.sub("", w["text"]).strip()]
+    marks = radio_marks(pg)
     info = {"n": n, "mode": "typed", "w": W, "h": H, "words": len(words), "tables": [], "figures": [], "flags": []}
     segs = []
+    # attempt-review furniture: the left status column, typed entries in answer boxes
+    mx = margin_column(words, W)
+    if mx:
+        mw = [w for w in words if w["x1"] <= mx and H * 0.05 < w["top"] < H * 0.95]
+        words = [w for w in words if w not in mw]
+        boxes_ = []
+        for ln in group_lines(mw, tol=4):
+            t = " ".join(w["text"] for w in ln["words"])
+            if QBOX_RE.match(t) or not boxes_ or ln["top"] - boxes_[-1]["bottom"] > 30:
+                boxes_.append({"top": ln["top"], "bottom": ln["bottom"], "text": [t]})
+            else:
+                boxes_[-1]["text"].append(t); boxes_[-1]["bottom"] = ln["bottom"]
+        for b in boxes_:
+            m = QBOX_RE.match(b["text"][0])
+            segs.append({"kind": "margin", "top": b["top"] - 0.5, "num": int(m.group(1)) if m else None, "text": " · ".join(b["text"])})
+        info["flags"].append("attempt review: status column -> [[item N]] + ignored lines")
+    eboxes = entry_boxes(pg, words, marks)
+    nav = [b for b in eboxes if any(w["text"].startswith("Jump") for w in words if inside(w, b, 2))]
+    nav_cut = (min(b[1] for b in nav) - 40) if nav else None
+    if nav:                                          # Moodle's activity navigation (Previous / Jump to... / Next) closes the page
+        cut = min(b[1] for b in nav) - 40
+        navw = [w for w in words if w["top"] >= cut and w["top"] < H * 0.95]
+        words = [w for w in words if w not in navw]
+        eboxes = [b for b in eboxes if b[1] < cut]
+        if navw: segs.append({"kind": "margin", "top": cut, "num": None, "text": " ".join(w["text"] for w in navw)})
+    for b in eboxes:
+        inn = [w for w in words if inside(w, b, 2)]
+        words = [w for w in words if w not in inn]
+        segs.append({"kind": "blank", "top": (b[1] + b[3]) / 2, "x": b[0], "text": " ".join(w["text"] for w in sorted(inn, key=lambda w: w["x0"])),
+                     "bbox": b})
+    if eboxes: info["flags"].append(f"{len(eboxes)} answer boxes -> [[blank]] (typed entries kept as ignored lines)")
     tboxes = []
     for k, t in enumerate(pg.find_tables(), 1):
         rows = [[(c or "").replace("\n", " ").strip() for c in r] for r in t.extract()]
@@ -159,6 +298,11 @@ def typed_page(pg, n):
         b = (o["x0"], o["top"], o["x1"], o["bottom"])
         if any(b[0] >= tb[0] - 3 and b[2] <= tb[2] + 3 and b[1] >= tb[1] - 3 and b[3] <= tb[3] + 3 for tb in tboxes): continue
         if (b[3] - b[1]) < 1.5 and (b[2] - b[0]) > W * 0.5: continue        # horizontal rules
+        if (b[2] - b[0]) <= 13 and (b[3] - b[1]) <= 13 and any(abs(b[0] - m[0]) < 4 and abs(b[1] - m[1]) < 4 for m in marks):
+            continue                                                         # radio buttons / check boxes and their dots
+        if sum(1 for w in words if inside(w, b)) >= 8: continue              # a frame around text (card, feedback box), not a figure
+        if any(abs(b[0] - e[0]) < 4 and abs(b[1] - e[1]) < 4 for e in eboxes): continue   # answer boxes
+        if nav_cut is not None and b[1] >= nav_cut: continue                  # navigation buttons
         graphics.append(b)
     for im in pg.images:
         graphics.append((im["x0"], im["top"], im["x1"], im["bottom"]))
@@ -195,13 +339,29 @@ def typed_page(pg, n):
         tops = [l["top"] for l in run_]; bots = [l["bottom"] for l in run_]
         info["tables"].append({"id": f"p{n}u1", "bbox": [round(min(l['x0'] for l in run_), 1), round(min(tops), 1),
                                round(max(l['x1'] for l in run_), 1), round(max(bots), 1)], "ruled": False})
+    lines = merge_small(lines)
+    if marks:
+        lines = option_lines(lines, marks)
+        nopt = sum(1 for ln in lines if ln.get("opt"))
+        if nopt:
+            info["flags"].append(f"{nopt} answer options next to radio buttons/check boxes -> [[options]] blocks")
+            if any(ln.get("selected") for ln in lines): info["flags"].append("a selected option is marked (attempt review): evidence, not part of the paper")
+    key = None                                       # attempt feedback: "The correct answer is: ..." (+ its wrapped lines)
     for i, ln in enumerate(lines):
-        segs.append({"kind": "line", "top": ln["top"], "order": ln.get("order"), "text": styled(ln["words"]),
-                     "bbox": (ln["x0"], ln["top"], ln["x1"], ln["bottom"])})
+        t = styled(ln["words"])
+        col = ln["words"][0].get("non_stroking_color")
+        if KEY_RE.match(t) and not ln.get("opt"):
+            key = {"kind": "key", "top": ln["top"], "text": t, "col": col, "x0": ln["x0"], "bottom": ln["bottom"]}
+            segs.append(key); continue
+        if key and col == key["col"] and abs(ln["x0"] - key["x0"]) < 3 and ln["top"] - key["bottom"] < 22 and not ln.get("opt"):
+            key["text"] += " " + t; key["bottom"] = ln["bottom"]; continue
+        key = None
+        segs.append({"kind": "line", "top": ln["top"], "order": ln.get("order"), "text": t, "feedback": bool(FEED_MARK_RE.match(t)),
+                     "bbox": (ln["x0"], ln["top"], ln["x1"], ln["bottom"]), "opt": bool(ln.get("opt")), "x": ln["x0"]})
     if any(s.get("order") is not None for s in segs):
         segs.sort(key=lambda s: (s["order"] if s.get("order") is not None else 1e9, s["top"]))
     else:
-        segs.sort(key=lambda s: s["top"])
+        segs.sort(key=lambda s: (s["top"], s.get("x", 0)))
     return segs, info
 
 
@@ -372,7 +532,23 @@ def ingest_file(path, fid, desk, role_hint=None):
     lines = []
     for segs, info in pages:
         lines.append(f"=== page {info['n']} ===")
+        in_opts = False
         for s in segs:
+            if in_opts and not (s["kind"] == "line" and s.get("opt")):
+                lines.append("[[/options]]"); in_opts = False
+            if s["kind"] == "line" and s.get("opt") and not in_opts:
+                lines.append("[[options]]"); in_opts = True
+            if s["kind"] == "margin":
+                if s.get("num") is not None: lines.append(f"[[item {s['num']}]]")
+                lines.append("#~ " + s["text"]); continue
+            if s["kind"] == "blank":
+                lines.append("[[blank]]")
+                if s["text"]: lines.append("#~ [entry] " + s["text"])
+                continue
+            if s["kind"] == "key":
+                lines.append("[[key]] " + s["text"]); continue
+            if s["kind"] == "line" and s.get("feedback"):
+                lines.append("#~ " + s["text"]); s["ign"] = True; continue
             if s["kind"] == "line":
                 key = re.sub(r"\d+", "#", s["text"].strip().lower())
                 ign = key in furniture or (PAGENO_RE.match(s["text"].strip()) and
@@ -389,6 +565,7 @@ def ingest_file(path, fid, desk, role_hint=None):
             elif s["kind"] == "figure":
                 s["crop"] = f"work/view/{fid}-{s['id']}.png"
                 lines.append(f"[[figure {s['id']} {s['crop']}]]")
+        if in_opts: lines.append("[[/options]]")
         rec["pages"].append(info)
     rec["furniture"] = sorted(EXAMPLE.get(k, k) for k in furniture)
     rec["linemap"] = {}                              # "page:k" (k-th text line on the page) -> bbox in points
