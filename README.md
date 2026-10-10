@@ -1,4 +1,6 @@
 # Study Desk Generator
+[![Download Latest Release](https://shields.io)](../../releases/latest)
+
 
 > Hello! (from a real person). This is all (obviously) AI generated slop. Please use it at your own discretion. I made this solely for my own personal use, so I can't assure it'll work for everyone. I did this to help me study for my MBA and maybe someone will find a use for this! I'll keep improving it, subject to my own requirements.
 
