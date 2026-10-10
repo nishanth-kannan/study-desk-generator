@@ -1,5 +1,5 @@
 # Study Desk Generator
-[![Download Latest Release](https://shields.io)](../../releases/latest)
+[![Static Badge](https://img.shields.io/badge/Latest%20Release-Download-brightgreen?style=for-the-badge)](../../releases/latest)
 
 
 > Hello! (from a real person). This is all (obviously) AI generated slop. Please use it at your own discretion. I made this solely for my own personal use, so I can't assure it'll work for everyone. I did this to help me study for my MBA and maybe someone will find a use for this! I'll keep improving it, subject to my own requirements.
