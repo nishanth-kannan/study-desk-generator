@@ -11,7 +11,9 @@ reference**. Progress is saved in the browser. Scripts do the copying, checking 
 you do the reading, judging and writing. You never hand-write the HTML, CSS or JavaScript, and
 you never retype a past paper.
 
-Tools: https://github.com/nishanth-kannan/study-desk-generator (this file needs **v2 or later** in the v2 line).
+Tools: https://github.com/nishanth-kannan/study-desk-generator (this file needs **v2.2 or later** in the v2 line: v2.2 added
+answer-format detection — unlettered options, answer boxes, printed keys and multi-part questions — past-paper
+examples inside concept notes, and Reveal all / Hide all toggles).
 
 ---
 
@@ -45,8 +47,8 @@ Tools: https://github.com/nishanth-kannan/study-desk-generator (this file needs 
 
 ```bash
 T="<skill base directory>/scripts"
-ok() { case "$(cat "$1/VERSION" 2>/dev/null)" in v2.0|v2.1|v2.2|v2.0.*|v2.1.*|v2.2.*) false ;; v2.*) true ;; *) false ;; esac; }
-if ! ok "$T"; then                                   # bundled tools missing or older than v2.x: fetch the newest v2.x release
+ok() { case "$(cat "$1/VERSION" 2>/dev/null)" in v2.0|v2.1|v2.0.*|v2.1.*) false ;; v2.*) true ;; *) false ;; esac; }
+if ! ok "$T"; then                                   # bundled tools missing or older than v2.2: fetch the newest v2.x release
   T=/tmp/study-desk-tools/study-desk/scripts
   if ! ok "$T"; then
     rm -rf /tmp/study-desk-tools
@@ -55,12 +57,12 @@ if ! ok "$T"; then                                   # bundled tools missing or 
     [ -n "$TAG" ] && git -c advice.detachedHead=false clone -q --depth 1 --branch "$TAG" "$REPO" /tmp/study-desk-tools
   fi
 fi
-if ok "$T"; then python3 "$T/check_env.py"; else echo "STOP: study-desk tools v2.x+ not found"; false; fi
+if ok "$T"; then python3 "$T/check_env.py"; else echo "STOP: study-desk tools v2.2+ not found"; false; fi
 ```
 
 It prints the tools' version and absolute path: use that path in every later command (shell
 variables don't carry between commands). If it prints STOP or the clone fails, **stop and tell the
-student** (v2.x must be released in the repo); never recreate the scripts from memory. Work in a
+student** (v2.2 must be released in the repo); never recreate the scripts from memory. Work in a
 desk folder (e.g. `./om1-desk/`) and run every command from it.
 
 ---

@@ -268,6 +268,21 @@ details.ex-ans p,details.ex-ans li{font-size:14.3px;line-height:1.6;color:var(--
 .ex-key{background:var(--ok-soft);border-radius:4px;padding:6px 10px;color:var(--ink)!important}
 .ex-go{margin-top:4px}
 .flash{outline:2px solid var(--accent);outline-offset:4px;border-radius:6px}
+
+/* ---- layout: centred content, slim side gutters, one reading width per view ---- */
+.top-in,.wrap{max-width:1180px;padding-inline:clamp(10px,2.4vw,20px)}
+.cols{gap:clamp(16px,2.6vw,30px)}
+.cols > div:last-child,#notesbody{width:100%;max-width:860px;margin-inline:auto;min-width:0}
+.guide{width:100%;max-width:940px;margin-inline:auto}
+.stem,.expl,.note,.note-gist,.sec > h3,.sec p,.sec ul,.dl,.cbox,.ex-card,.q.qhead .stem{max-width:none}
+/* the paper note: only its title is a heading; bold words inside it stay inline */
+.note b{display:inline;font-family:inherit;font-size:inherit;margin:0}
+.note > b:first-child{display:block;font-family:var(--serif);font-size:16px;margin-bottom:3px}
+/* formulas inside a sentence flow with the text instead of breaking it into boxes */
+.sec p .fx,.sec li .fx,.sec dd .fx,.cbox .fx,.expl p .fx,.expl li .fx,.ex-why .fx{display:inline;margin:0;padding:1px 6px;border-left-width:2px;
+  line-height:inherit;-webkit-box-decoration-break:clone;box-decoration-break:clone;white-space:normal}
+.deck{grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+@media (max-width:880px){.cols > div:last-child,#notesbody,.guide{max-width:none}}
 </style></head>
 <body>
 
