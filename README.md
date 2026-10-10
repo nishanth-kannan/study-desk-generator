@@ -7,6 +7,7 @@
 
 ### What your study desk will look like :)
 ![Concepts](docs/screenshots/concepts.png)
+
 ![Past Papers](docs/screenshots/past-papers.png)
 
 A Claude skill that turns your course material — past papers, official solutions, readings, slides —
