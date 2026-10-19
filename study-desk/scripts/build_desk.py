@@ -22,7 +22,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "desk_template.html"
 sys.path.insert(0, str(HERE))
-import calc as CALC, checks as CHECKS, compare as COMPARE  # noqa: E402
+import calc as CALC, checks as CHECKS, compare as COMPARE, mathtex as MATH  # noqa: E402
 from sdcommon import load_data  # noqa: E402
 BASE = Path(".")
 WARN = []
@@ -662,6 +662,9 @@ def main():
         for it in z.get("qs") or []:
             for c in it.get("_check") or []:
                 errors.append(f"paper {z['id']} {it.get('name') or it.get('n')}: unconfirmed scaffold guess: {c} -- confirm, then delete _check")
+    uses_math = MATH.check(d, errors, warnings)
+    macros = MATH.check_macros(meta, errors)
+    if uses_math: summary.append("maths: LaTeX found -> KaTeX embedded (offline, fonts inlined)")
     errors = ERR + errors
     warnings = WARN + warnings
     # 5. compare sheet (also when the build fails: it shows where)
@@ -697,6 +700,7 @@ def main():
     strip_private(d)
     tpl = Path(a.template).read_text(encoding="utf-8").replace("</style>", theme_css + "</style>", 1)
     payload = json.dumps(d, ensure_ascii=False, separators=(",", ":")).replace("</script", "<\\/script")
+    tpl = tpl.replace("<!--__MATH__-->", MATH.assets(macros) if uses_math else "", 1)
     htmlout = tpl.replace("__TITLE__", html.escape(meta["title"])).replace("__DESK_DATA__", payload)
     out.write_text(htmlout, encoding="utf-8")
     print(f"  theme: {tname} · wrote {out} ({len(htmlout)/1024:.0f} KB, self-contained)")

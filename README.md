@@ -151,6 +151,7 @@ The build refuses to write the desk if any check fails.
 | Official solutions | The same checks against the solution sheet |
 | Excel workings | Formulae recalculated in LibreOffice that disagree with the key, the correct option or the official solution (unless the key is marked as disputed, which the desk shows) |
 | Unconfirmed guesses | Anything the scaffold guessed that nobody confirmed |
+| Maths | Unbalanced or nested `\( \)` / `\[ \]` delimiters (build); formulae KaTeX can't typeset or left raw (verify) |
 
 ---
 
@@ -191,7 +192,8 @@ python3 $S/verify.py --compare work/compare.html --top 6 --out work/review.png
 | `ingest.py` | Classifies uploads, writes verbatim `sources/<id>.txt`, OCRs scans, inventories tables/figures, writes `work/summary.txt` and the images worth viewing. Options: `--role ID=paper\|solution\|reading`, `--pair SOL=PAPER`. |
 | `scaffold.py` | Splits sources into question items and attaches official solutions. Re-run after editing a source; your own fields are kept. |
 | `build_desk.py` | Runs every check and the Excel recalculation, writes the desk, the workbook, `work/compare.html` and `work/build_report.txt`. Options: `--sections`, `--theme`, `--check`. |
-| `verify.py` | Headless smoke test of the desk; or screenshots of the riskiest compare rows. |
+| `verify.py` | Headless smoke test of the desk (tabs, answers, LaTeX rendering, phone width); or screenshots of the riskiest compare rows. |
+| `mathtex.py` | LaTeX support: checks `\( \)` / `\[ \]` delimiters and embeds KaTeX (vendored, fonts inlined) when a desk has maths. |
 
 The data format (`meta.json`, papers, concepts, bank, `calc` blocks, diagram blocks) is documented in
 [`study-desk/SKILL.md`](study-desk/SKILL.md#data-layout).
@@ -221,7 +223,8 @@ question, add a directive line to `sources/<id>.txt` and re-run `scaffold.py`:
 ```
 study-desk/              the installable skill (the release zip contains this folder)
   SKILL.md               instructions Claude follows
-  scripts/               ingest, scaffold, build_desk, checks, calc, compare, verify, check_env, template, VERSION
+  scripts/               ingest, scaffold, build_desk, checks, calc, compare, mathtex, verify, check_env, template, VERSION
+  scripts/vendor/katex/  KaTeX 0.16 (MIT) for offline LaTeX: js, auto-render, css, woff2 fonts
 tests/                   synthetic fixtures, scripted "Claude" edits, fault injection, OCR evaluation
 .github/workflows/       release: tests, then publishes study-desk.zip
 ```
@@ -229,7 +232,7 @@ tests/                   synthetic fixtures, scripted "Claude" edits, fault inje
 ## Development
 
 **Tests:** `tests/run.sh` generates synthetic papers (typed, scanned, typed solutions,
-handwritten-style solutions), runs the whole pipeline, injects 16 realistic mistakes that the
+handwritten-style solutions), runs the whole pipeline, injects 18 realistic mistakes (plus 2 LaTeX faults checked in the browser) that the
 build must catch, and measures OCR accuracy. Run it before every release.
 
 **Versioning.** An installed `SKILL.md` fetches the newest release of its **major** version
@@ -257,4 +260,5 @@ synthetic material only.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Bundled KaTeX is MIT — see
+[`study-desk/scripts/vendor/katex/LICENSE`](study-desk/scripts/vendor/katex/LICENSE).

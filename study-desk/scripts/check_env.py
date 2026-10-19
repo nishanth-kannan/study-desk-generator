@@ -39,6 +39,9 @@ def main():
     bins = {b: shutil.which(b) for b in ["pdftoppm", "pdftotext", "tesseract", "soffice"]}
     bad = [m for m in REQUIRED_PY if m in missing] + [b for b in REQUIRED_BIN if not bins[b]]
     off = sorted({OPTIONAL[x] for x in missing + [b for b, p in bins.items() if not p] if x in OPTIONAL})
+    kx = HERE / "vendor" / "katex"
+    if not all((kx / f).exists() for f in ("katex.min.js", "auto-render.min.js", "katex.min.css")) or not list((kx / "fonts").glob("*.woff2")):
+        bad.append("vendor/katex (LaTeX maths)")
     if bad: sys.exit(f"tools {ver}: MISSING REQUIRED {', '.join(bad)} -- install them before building")
     print(f"tools {ver} OK ({HERE})" + (f"; switched off: {', '.join(off)}" if off else "; all features available"))
 

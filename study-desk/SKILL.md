@@ -11,9 +11,9 @@ reference**. Progress is saved in the browser. Scripts do the copying, checking 
 you do the reading, judging and writing. You never hand-write the HTML, CSS or JavaScript, and
 you never retype a past paper.
 
-Tools: https://github.com/nishanth-kannan/study-desk-generator (this file needs **v2.2 or later** in the v2 line: v2.2 added
-answer-format detection — unlettered options, answer boxes, printed keys and multi-part questions — past-paper
-examples inside concept notes, and Reveal all / Hide all toggles).
+Tools: https://github.com/nishanth-kannan/study-desk-generator (this file needs **v2.3 or later** in the v2 line: v2.3 added
+LaTeX maths, typeset offline with KaTeX; v2.2 added answer-format detection — unlettered options, answer boxes, printed
+keys and multi-part questions — past-paper examples inside concept notes, and Reveal all / Hide all toggles).
 
 ---
 
@@ -47,8 +47,8 @@ examples inside concept notes, and Reveal all / Hide all toggles).
 
 ```bash
 T="<skill base directory>/scripts"
-ok() { case "$(cat "$1/VERSION" 2>/dev/null)" in v2.0|v2.1|v2.0.*|v2.1.*) false ;; v2.*) true ;; *) false ;; esac; }
-if ! ok "$T"; then                                   # bundled tools missing or older than v2.2: fetch the newest v2.x release
+ok() { case "$(cat "$1/VERSION" 2>/dev/null)" in v2.0|v2.1|v2.2|v2.0.*|v2.1.*|v2.2.*) false ;; v2.*) true ;; *) false ;; esac; }
+if ! ok "$T"; then                                   # bundled tools missing or older than v2.3: fetch the newest v2.x release
   T=/tmp/study-desk-tools/study-desk/scripts
   if ! ok "$T"; then
     rm -rf /tmp/study-desk-tools
@@ -57,12 +57,12 @@ if ! ok "$T"; then                                   # bundled tools missing or 
     [ -n "$TAG" ] && git -c advice.detachedHead=false clone -q --depth 1 --branch "$TAG" "$REPO" /tmp/study-desk-tools
   fi
 fi
-if ok "$T"; then python3 "$T/check_env.py"; else echo "STOP: study-desk tools v2.2+ not found"; false; fi
+if ok "$T"; then python3 "$T/check_env.py"; else echo "STOP: study-desk tools v2.3+ not found"; false; fi
 ```
 
 It prints the tools' version and absolute path: use that path in every later command (shell
 variables don't carry between commands). If it prints STOP or the clone fails, **stop and tell the
-student** (v2.2 must be released in the repo); never recreate the scripts from memory. Work in a
+student** (v2.3 must be released in the repo); never recreate the scripts from memory. Work in a
 desk folder (e.g. `./om1-desk/`) and run every command from it.
 
 ---
@@ -275,8 +275,29 @@ missing, any disputed keys, and that `work/compare.html` lets the student check 
   `e_explain`, `calc`; a part with `head: true` is a passage between sub-parts. Fields starting `_`,
   and `src`/`e_src`/`blanks`, belong to the scripts: leave them alone.
 - Text fields take inline HTML: `<b> <em> <code> <br> <sub> <sup> <ul>/<ol>/<li> <h4>`;
-  `<span class='fx'>` for a formula, `<span class='warn'>` for a caveat or disputed key,
+  `<span class='fx'>` for a boxed formula, `<span class='warn'>` for a caveat or disputed key,
   `<b class='ans'>` for printed answer hints (blurred in bank refs), `<h5>` for sub-headings.
+- **Maths is LaTeX** (see *Maths* below) in every field you write: explanations, notes, guide, bank questions.
+
+### Maths (LaTeX)
+
+Write every formula in LaTeX; the desk typesets it offline with KaTeX (embedded only when the desk has maths).
+
+| Write | For |
+|---|---|
+| `\( … \)` | inline maths: `\(\beta = \sigma_i\rho_{i,M}/\sigma_M\)` |
+| `\[ … \]` | a display formula on its own line: `\[P_0 = \frac{\mathit{Div}_1}{r_E - g}\]` |
+| `<span class='fx'>\( … \)</span>` | the key formula of a step, boxed |
+
+- **Dollar signs are not delimiters** (prices are everywhere): `$5.00` stays text; inside maths write `\$`.
+- In JSON every backslash is doubled: `"\\(P_0 = \\frac{a}{b}\\)"`. In Python use raw strings.
+- Text is HTML, so write `<` / `>` in maths as `\lt` / `\gt`.
+- Multi-letter names as one word: `\mathit{Div}_1`, `\mathrm{WACC}`, `\mathrm{FCF}_t`; word subscripts as `_{\text{peers}}`.
+- In running text use `\dfrac` (or `a/b`) so fractions stay legible; anything tall goes in `\[ … \]`.
+- Repeated notation: `meta.mathMacros`, e.g. `{"\\Div": "\\mathit{Div}"}` in JSON, then `\Div_1` anywhere.
+- **Never** put LaTeX into a past paper's `q`/`o` (rule 1): it is copied verbatim; maths goes in solutions.
+- The build rejects unbalanced or nested `\(` / `\[`; `verify.py` fails on any formula KaTeX can't parse
+  and on raw `\(` left on screen.
 
 ### calc
 
@@ -317,6 +338,7 @@ has, pin another.
 
 ## Common failure modes
 
+- Formulae written with `<sub>`/`<sup>` or `$…$` instead of `\( … \)` LaTeX.
 - Retyping or "tidying" a past-paper question instead of fixing the source and re-running scaffold.
 - **Turning a choice or numeric question into a written answer box** (missed `[[options]]`, a
   Moodle MCQ shown as "Subjective", sub-parts a)–o) lumped into one textarea). Check the build's
