@@ -37,6 +37,8 @@ FAULTS = [  # (what, paper, mutate(paper_json), expected message)
     ("calc disagrees with option", "seta", lambda d: item(d, "MCQ 4")["calc"]["rows"][1].__setitem__(1, 15), "the correct option says"),
     ("answer not set", "setb_scan", lambda d: item(d, "MCQ 2").update(a=None), "answer not set"),
     ("explanation missing", "seta", lambda d: item(d, "MCQ 3").pop("e_explain"), "no e_explain"),
+    ("maths left open", "seta", lambda d: item(d, "MCQ 3").update(e_explain=item(d, "MCQ 3")["e_explain"] + " \\(L = \\lambda W"), "never closed"),
+    ("maths closed wrong", "seta", lambda d: item(d, "MCQ 3").update(e_explain=item(d, "MCQ 3")["e_explain"] + " \\[L = \\lambda W\\)"), "closed by"),
     ("guess left unconfirmed", "seta", lambda d: item(d, "MCQ 5").update(_check=["lower-case options read as MCQ"]), "unconfirmed scaffold guess"),
 ]
 

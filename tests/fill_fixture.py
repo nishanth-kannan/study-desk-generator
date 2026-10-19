@@ -54,7 +54,8 @@ def fill_a(d):
                            ["Waiting time W (minutes)", "=B3*60"]], "answer": ["Waiting time W (minutes)"], "expect": [21.6]}
     item(d, "MCQ 3")["e_explain"] = "Only time saved at the bottleneck adds capacity; buffers and faster non-bottlenecks do not."
     m4 = item(d, "MCQ 4")
-    m4["e_explain"] = "Little's Law: flow time = inventory ÷ flow rate = 15 ÷ 30 = 0.5 hours. 2 hours inverts the ratio."
+    m4["e_explain"] = ("Little's Law, \\(L = \\lambda W\\), so flow time = inventory ÷ flow rate:"
+                       "\\[W = \\frac{L}{\\lambda} = \\frac{15}{30} = 0.5 \\text{ hours}\\]2 hours inverts the ratio.")
     m4["calc"] = {"rows": [["Inventory", 15], ["Flow rate (per hour)", 30], ["Flow time (hours)", "=B1/B2"]]}
     item(d, "MCQ 5")["e_explain"] = "Little's Law needs only a stable system and long-run averages; it makes no assumption about arrival distributions."
 

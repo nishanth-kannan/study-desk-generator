@@ -5,7 +5,8 @@
     python3 verify.py --compare work/compare.html --top 6 --out work/review.png
 
 Desk checks: every visible tab renders content, Check answer reveals an explanation, every past paper
-renders, figures are present, no JavaScript errors, no sideways scroll at 400 px (light and dark).
+renders, figures are present, LaTeX renders with no errors or raw \\( \\) left, no JavaScript errors,
+no sideways scroll at 400 px (light and dark).
 Prints failures only, then one summary line.
 """
 import argparse, sys
@@ -60,6 +61,17 @@ def desk(path):
                             if pg.locator("#view-past").is_hidden(): fails.append("an example's 'Practise it' link did not open Past Papers")
                             tab.click(); pg.wait_for_timeout(80)
                             break
+                if pg.evaluate("!!window.katex"):                       # LaTeX: every formula rendered, none left raw
+                    pg.wait_for_timeout(60)
+                    v = tab.get_attribute('data-view')
+                    bad = pg.locator(f"#view-{v} .katex-error").all()
+                    for e in bad[:3]: fails.append(f"[{scheme}] {label}: LaTeX error in {(e.get_attribute('title') or e.inner_text())[:90]!r}")
+                    unk = pg.evaluate("""v => [...document.querySelectorAll('#view-' + v + ' .katex mstyle[mathcolor="#c9001b"]')]
+                                         .map(e => e.closest('.katex').querySelector('annotation').textContent)""", v)
+                    for t in unk[:3]: fails.append(f"[{scheme}] {label}: unknown LaTeX command in {t[:90]!r}")
+                    raw = pg.evaluate("""v => { const t = document.querySelector('#view-' + v).innerText; const m = t.match(/\\\\[\\(\\[][^\\n]{0,40}/); return m ? m[0] : ''; }""",
+                                      tab.get_attribute("data-view"))
+                    if raw: fails.append(f"[{scheme}] {label}: unrendered maths {raw!r}")
                 sw = pg.evaluate("document.documentElement.scrollWidth")
                 if sw > width + 1: fails.append(f"[{scheme} {width}px] sideways scroll on {label} ({sw}px)")
             if errs: fails.append(f"JavaScript errors ({scheme}): {errs[:3]}")

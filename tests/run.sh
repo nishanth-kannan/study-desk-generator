@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end test on synthetic fixtures. Run before tagging a release.
 #   tests/run.sh [workdir]
-# fixtures -> ingest -> scaffold -> (Claude's edits, scripted) -> build -> verify -> compare screenshot -> fault injection -> OCR eval
+# fixtures -> ingest -> scaffold -> (Claude's edits, scripted) -> build -> verify -> compare screenshot -> fault injection
+#   -> LaTeX faults in the browser -> OCR eval
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 T="$ROOT/study-desk/scripts"
@@ -19,5 +20,6 @@ step "build";        time python3 "$T/build_desk.py" data -o "$W/desk/Fixture Op
 step "verify";       python3 "$T/verify.py" "$W/desk/Fixture Ops Study Desk.html"
 step "compare";      python3 "$T/verify.py" --compare work/compare.html --top 3 --out work/review.png
 step "faults";       python3 "$ROOT/tests/faults.py" "$W/desk"
+step "maths faults"; python3 "$ROOT/tests/maths_faults.py" "$W/desk"
 step "OCR";          python3 "$ROOT/tests/ocr_eval.py" "$W/fx" "$W/desk"
 printf '\nALL PASSED  (workdir %s)\n' "$W"
