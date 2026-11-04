@@ -12,7 +12,7 @@ you do the reading, judging and writing. You never hand-write the HTML, CSS or J
 you never retype a past paper.
 
 Tools: https://github.com/nishanth-kannan/study-desk-generator (this file needs **v2.3 or later** in the v2 line: v2.3 added
-LaTeX maths, typeset offline with KaTeX, and made the desk open on Concepts with each tab keeping its own scroll position; v2.2 added answer-format detection — unlettered options, answer boxes, printed
+LaTeX maths, typeset offline with KaTeX, and made the desk open on Concepts with each tab keeping its own scroll position, and collected each concept section's formulas into a "Formulas to remember" box; v2.2 added answer-format detection — unlettered options, answer boxes, printed
 keys and multi-part questions — past-paper examples inside concept notes, and Reveal all / Hide all toggles).
 
 ---
@@ -185,7 +185,12 @@ One file per unit, revision notes someone who skipped the lecture could learn fr
 terms, `table` for real comparisons, `list` for ordered enumerations, `p` for arguments and `box`
 for memory hooks. Write headings as claims ("Parallel ≠ always add — the croissant trap").
 Reproduce the reading's canonical examples. End each unit with a box titled *In the exam* naming
-the recurring question shapes. Figures come from the readings or official solutions.
+the recurring question shapes. **Mark every formula a student should recall** with `<span class='fx'>…</span>`
+(identities, multipliers, curve equations; not worked numbers, not inside tables): it shows in bold in its
+sentence, and the desk collects each section's formulas into a *Formulas to remember* box after its explanation.
+Check every block for formulas, including ones written with `<sub>`/`<sup>`. Mark each formula once: don't mark a
+rearranged copy of the same identity. Figures come from the readings or official solutions.
+
 
 **Past-paper examples (when papers are in the desk).** Under each section a past paper tests, add
 `{"t": "ex", "paper": "<id>", "n": <n>, "part": "g)", "why": "<one line: what this shows>"}`
@@ -353,6 +358,7 @@ has, pin another.
   key or option to check against).
 - Piling questions into a few units (check the coverage line and rebalance); obvious distractors;
   explanations that just restate the right option.
+- Formulas left unmarked in concept notes.
 - Concept notes with no past-paper examples when papers are in the desk, or examples typed into a
   `p` block instead of an `ex` block.
 - Shipping an answer key you didn't verify; building sections the student didn't ask for.

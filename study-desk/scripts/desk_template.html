@@ -278,10 +278,26 @@ details.ex-ans p,details.ex-ans li{font-size:14.3px;line-height:1.6;color:var(--
 /* the paper note: only its title is a heading; bold words inside it stay inline */
 .note b{display:inline;font-family:inherit;font-size:inherit;margin:0}
 .note > b:first-child{display:block;font-family:var(--serif);font-size:16px;margin-bottom:3px}
-/* formulas inside a sentence flow with the text instead of breaking it into boxes */
-.sec p .fx,.sec li .fx,.sec dd .fx,.cbox .fx,.expl p .fx,.expl li .fx,.ex-why .fx{display:inline;margin:0;padding:1px 6px;border-left-width:2px;
+/* formulas inside an answer explanation flow with the text; concept notes set them in bold (below) */
+.expl p .fx,.expl li .fx,.ex-why .fx{display:inline;margin:0;padding:1px 6px;border-left-width:2px;
   line-height:inherit;-webkit-box-decoration-break:clone;box-decoration-break:clone;white-space:normal}
 .deck{grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+/* Formulas for quick recall. In concept notes a formula (<span class='fx'>) stays in its sentence in bold, with
+   no box (a box inside a callout reads as clutter); tables are left as they are. Each concept section then
+   collects its formulas into a "Formulas to remember" box after the explanation. Answer explanations and past-paper examples keep their own inline style. */
+.sec .fx,.cbox .fx,.guide .fx{display:inline;margin:0;padding:0;background:none;border:0;border-radius:0;
+  font:inherit;font-weight:700;color:var(--ink);white-space:normal}
+.sec table .fx{font-weight:inherit;color:inherit}
+.sec .expl .fx,.sec .ex-why .fx,.sec .ex-card .fx{padding:1px 6px;border:1px solid var(--line);border-left:2px solid var(--accent);border-radius:3px;
+  font-weight:inherit;background:var(--surface-2);color:var(--ink-2)}
+.fxbox{margin:16px 0 4px;padding:13px 16px 14px;background:var(--surface);border:1px solid var(--line);
+  border-top:3px solid var(--accent);border-radius:var(--r);max-width:74ch}
+.fxbox h5{margin:0 0 10px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);font-weight:700}
+.fxbox-f{margin:0 0 8px;padding:9px 13px;background:var(--accent-soft);border:1px solid var(--line);border-left:4px solid var(--accent);
+  border-radius:6px;font-family:var(--serif);font-size:18px;line-height:1.45;font-weight:600;color:var(--ink);overflow-x:auto}
+.fxbox-f:last-child{margin-bottom:0}
+.fxbox-f .fx{display:inline;margin:0;padding:0;background:none;border:0;font:inherit;color:inherit}
+@media (max-width:520px){.fxbox-f{font-size:16.5px}}
 @media (max-width:880px){.cols > div:last-child,#notesbody,.guide{max-width:none}}
 </style></head>
 <body>
@@ -759,6 +775,18 @@ function renderNotes(){
   if(QB.some(function(q){return q.unit===curCh})) nav+='<button class="chip" data-drill="'+c.unit+'">Drill '+UL+' '+c.unit+' questions →</button>';
   nav+='</div>';
   $('#notesbody').innerHTML = body+buf+nav;
+  /* each section ends with its formulas, collected into one box for recall */
+  document.querySelectorAll('#notesbody section.sec').forEach(function(sec){
+    var seen={}, fs=[];
+    sec.querySelectorAll('.fx').forEach(function(f){
+      if(f.closest('.expl,.ex-card,.ex-why,.fxbox,table')) return;
+      var k=f.textContent.replace(/\s+/g,' ').trim(); if(!k||seen[k]) return; seen[k]=1; fs.push(f);
+    });
+    if(!fs.length) return;
+    var box=document.createElement('div'); box.className='fxbox';
+    box.innerHTML='<h5>Formulas to remember</h5>'+fs.map(function(f){return '<div class="fxbox-f">'+f.innerHTML+'</div>';}).join('');
+    var ex=sec.querySelector(':scope > .ex-card'); if(ex) sec.insertBefore(box,ex); else sec.appendChild(box);
+  });
   $('#toc').innerHTML = secs.map(function(p){return '<button data-jump="'+p[0]+'"><span>'+p[1]+'</span></button>'}).join('');
   var qn=QB.filter(function(q){return q.unit===curCh}).length;
   var done=QB.filter(function(q){return q.unit===curCh && S.rev[q.id]!=null}).length;
