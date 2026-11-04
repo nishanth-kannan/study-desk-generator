@@ -12,7 +12,7 @@ you do the reading, judging and writing. You never hand-write the HTML, CSS or J
 you never retype a past paper.
 
 Tools: https://github.com/nishanth-kannan/study-desk-generator (this file needs **v2.3 or later** in the v2 line: v2.3 added
-LaTeX maths, typeset offline with KaTeX; v2.2 added answer-format detection — unlettered options, answer boxes, printed
+LaTeX maths, typeset offline with KaTeX, and made the desk open on Concepts with each tab keeping its own scroll position; v2.2 added answer-format detection — unlettered options, answer boxes, printed
 keys and multi-part questions — past-paper examples inside concept notes, and Reveal all / Hide all toggles).
 
 ---
@@ -236,7 +236,8 @@ python3 <tools>/verify.py "<Course> Study Desk.html"
 
 Checks every tab renders, Check answer works (bank and past papers, sub-parts included), Reveal
 all toggles back to Hide all, example links open Past Papers, every paper renders, no JS errors,
-no sideways scroll at 400 px in dark mode. (The bank's *Reveal all shown* toggles the same way.)
+no sideways scroll at 400 px in dark mode, the desk opens on Concepts, and each tab keeps its scroll
+position when you switch away and back. (The bank's *Reveal all shown* toggles the same way.)
 Deliver the HTML and
 `<Course> Study Desk - Excel workings.xlsx`.
 Say what's in each tab, which sections were left out, the theme, which official solutions were

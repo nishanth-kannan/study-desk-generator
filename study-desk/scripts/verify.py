@@ -6,7 +6,7 @@
 
 Desk checks: every visible tab renders content, Check answer reveals an explanation, every past paper
 renders, figures are present, LaTeX renders with no errors or raw \\( \\) left, no JavaScript errors,
-no sideways scroll at 400 px (light and dark).
+no sideways scroll at 400 px (light and dark), the desk opens on Concepts, and each tab keeps its scroll position.
 Prints failures only, then one summary line.
 """
 import argparse, sys
@@ -27,7 +27,19 @@ def desk(path):
             errs = []
             pg.on("pageerror", lambda e: errs.append(str(e)))
             pg.goto(path.as_uri()); pg.wait_for_timeout(300)
-            for tab in pg.locator(".tabs button:not([hidden])").all():
+            shown = pg.locator(".tabs button:not([hidden])").all()
+            if pg.locator("#tab-notes:not([hidden])").count() and pg.locator("#view-notes").is_hidden():
+                fails.append(f"[{scheme}] the desk does not open on the Concepts tab")
+            if len(shown) > 1:                                          # each tab keeps its own scroll position
+                a, other = shown[0], shown[1]
+                a.click(); pg.wait_for_timeout(80)
+                pg.evaluate("window.scrollTo(0, Math.min(600, document.documentElement.scrollHeight - innerHeight))")
+                pg.wait_for_timeout(80); y = pg.evaluate("Math.round(scrollY)")
+                other.click(); pg.wait_for_timeout(80); a.click(); pg.wait_for_timeout(80)
+                if y > 0 and abs(pg.evaluate("Math.round(scrollY)") - y) > 2:
+                    fails.append(f"[{scheme}] {a.inner_text().strip()} tab lost its scroll position after switching tabs")
+                pg.evaluate("window.scrollTo(0, 0)")
+            for tab in shown:
                 tab.click(); pg.wait_for_timeout(150); tabs += 1
                 label = tab.inner_text().strip()
                 view = pg.locator("#view-" + tab.get_attribute("data-view"))

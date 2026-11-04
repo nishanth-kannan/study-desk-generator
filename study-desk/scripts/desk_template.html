@@ -404,16 +404,24 @@ if(!CO.length || !wants('concepts'))  document.getElementById('tab-notes').hidde
 if(!QB.length || !wants('questions')) document.getElementById('tab-bank').hidden = true;
 if(guideEmpty || !wants('reference')) document.getElementById('tab-guide').hidden = true;
 
+/* Each tab keeps its own scroll position: leaving a tab records where the
+   reader was, coming back restores it (first visit starts at the top).
+   Positions live for the session only; the desk always opens on Concepts. */
+var curView = 'bank', tabScroll = {};
+function showView(v){
+  if(v !== curView) tabScroll[curView] = window.scrollY;
+  document.querySelectorAll('.tabs button').forEach(function(x){x.setAttribute('aria-selected', x.dataset.view===v?'true':'false');});
+  ['bank','past','notes','guide'].forEach(function(w){ $('#view-'+w).hidden = (w!==v); });
+  curView = v;
+  window.scrollTo({top:tabScroll[v]||0,behavior:'instant'});
+}
 document.querySelectorAll('.tabs button').forEach(function(b){
-  b.addEventListener('click',function(){
-    document.querySelectorAll('.tabs button').forEach(function(x){x.setAttribute('aria-selected', x===b?'true':'false');});
-    ['bank','past','notes','guide'].forEach(function(v){ $('#view-'+v).hidden = (v!==b.dataset.view); });
-    window.scrollTo({top:0,behavior:'instant'});
-  });
+  b.addEventListener('click',function(){ showView(b.dataset.view); });
 });
 var shownTabs = document.querySelectorAll('.tabs button:not([hidden])');
-var firstTab = shownTabs[0];
-if(firstTab && firstTab.id!=='tab-bank') firstTab.click();
+var notesTab = document.getElementById('tab-notes');
+var firstTab = !notesTab.hidden ? notesTab : shownTabs[0];
+if(firstTab) showView(firstTab.dataset.view);
 /* One section only: the tab strip is just a label, so drop it. */
 if(shownTabs.length < 2) document.querySelector('.tabs').hidden = true;
 
@@ -784,7 +792,7 @@ if(CO.length){
     if(g){ curCh=isNaN(+g.dataset.goto)?g.dataset.goto:+g.dataset.goto; renderNotes(); window.scrollTo({top:0,behavior:'instant'}); return; }
     var d=e.target.closest('[data-drill]');
     if(d){ F.ch=isNaN(+d.dataset.drill)?d.dataset.drill:+d.dataset.drill; F.term=''; if($('#q-search'))$('#q-search').value='';
-      renderBank(); document.getElementById('tab-bank').click(); }
+      renderBank(); document.getElementById('tab-bank').click(); window.scrollTo({top:0,behavior:'instant'}); }
   });
   $('#n-search').addEventListener('input',function(){nTerm=this.value.trim();renderNotes();});
 }
