@@ -278,7 +278,7 @@ details.ex-ans p,details.ex-ans li{font-size:14.3px;line-height:1.6;color:var(--
 /* the paper note: only its title is a heading; bold words inside it stay inline */
 .note b{display:inline;font-family:inherit;font-size:inherit;margin:0}
 .note > b:first-child{display:block;font-family:var(--serif);font-size:16px;margin-bottom:3px}
-/* formulas inside an answer explanation flow with the text; concept notes set them in bold (below) */
+/* formulas inside an answer explanation flow with the text; concept notes and the quick reference box them (below) */
 .expl p .fx,.expl li .fx,.ex-why .fx{display:inline;margin:0;padding:1px 6px;border-left-width:2px;
   line-height:inherit;-webkit-box-decoration-break:clone;box-decoration-break:clone;white-space:normal}
 .deck{grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
@@ -297,7 +297,23 @@ details.ex-ans p,details.ex-ans li{font-size:14.3px;line-height:1.6;color:var(--
   border-radius:6px;font-family:var(--serif);font-size:18px;line-height:1.45;font-weight:600;color:var(--ink);overflow-x:auto}
 .fxbox-f:last-child{margin-bottom:0}
 .fxbox-f .fx{display:inline;margin:0;padding:0;background:none;border:0;font:inherit;color:inherit}
-@media (max-width:520px){.fxbox-f{font-size:16.5px}}
+/* quick reference: frameworks as formula cards, with a self-test mode that hides each formula until tapped */
+.fw-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.fw-head h3{margin:0}
+.fw-hint{font-size:12.5px;color:var(--ink-3);margin:-4px 0 10px}
+.deck.fw-deck{grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.fw{display:flex;flex-direction:column;gap:10px;padding:16px 16px 14px;border-top:3px solid var(--accent)}
+.fw h4{margin:0;font-size:15px;font-weight:700;color:var(--ink)}
+.fw-row{display:flex;flex-direction:column;gap:3px}
+.fw-lab{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.fw-f{background:var(--accent-soft);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:6px;
+  padding:9px 13px;font-family:var(--serif);font-size:18px;line-height:1.45;font-weight:600;color:var(--ink);overflow-x:auto;
+  transition:filter .15s ease}
+.fw-f .fx{display:inline;margin:0;padding:0;background:none;border:0;font:inherit;color:inherit}
+.fw .fw-note{margin:0;font-size:13px;line-height:1.55;color:var(--ink-2)}
+.guide.recall .fw-f{filter:blur(7px);cursor:pointer;user-select:none}
+.guide.recall .fw-f.shown{filter:none;cursor:default;user-select:auto}
+@media (max-width:520px){.fxbox-f,.fw-f{font-size:16.5px}}
 @media (max-width:880px){.cols > div:last-child,#notesbody,.guide{max-width:none}}
 </style></head>
 <body>
@@ -841,8 +857,20 @@ function renderGuide(){
     h+='</table></div></div>';
   }
   if(GUIDE.frameworks&&GUIDE.frameworks.length){
-    h+='<div><h3>'+(GUIDE.frameworksTitle||'Frameworks worth knowing cold')+'</h3><div class="deck">'+
-      GUIDE.frameworks.map(function(f){return '<div class="card"><h4>'+f.h+'</h4><p>'+f.x+'</p></div>'}).join('')+'</div></div>';
+    /* A framework lists its formulas in f: ["formula", or ["label", "formula"], ...]; x is an optional note.
+       Older desks give only x: its formulas (.fx) still get the formula-box style. */
+    var anyF=GUIDE.frameworks.some(function(f){return f.f&&f.f.length;});
+    h+='<div><div class="fw-head"><h3>'+(GUIDE.frameworksTitle||'Frameworks worth knowing cold')+'</h3>'+
+      (anyF?'<button class="btn ghost" id="fw-test">Test yourself: hide formulas</button>':'')+'</div>'+
+      (anyF?'<p class="fw-hint" id="fw-hint" hidden>Say each formula from memory, then tap its box to check.</p>':'')+
+      '<div class="deck fw-deck">'+
+      GUIDE.frameworks.map(function(f){
+        var rows=(f.f||[]).map(function(r){
+          var lab=Array.isArray(r)?r[0]:'', fx=Array.isArray(r)?r[1]:r;
+          return '<div class="fw-row">'+(lab?'<span class="fw-lab">'+lab+'</span>':'')+'<div class="fw-f" tabindex="0">'+fx+'</div></div>';
+        }).join('');
+        return '<div class="card fw"><h4>'+f.h+'</h4>'+rows+(f.x?'<p class="fw-note">'+f.x+'</p>':'')+'</div>';
+      }).join('')+'</div></div>';
   }
   if(GUIDE.traps&&GUIDE.traps.length){
     h+='<div><h3>'+(GUIDE.trapsTitle||'Traps the past papers keep setting')+'</h3>'+
@@ -851,6 +879,21 @@ function renderGuide(){
   if(GUIDE.sources) h+='<div><h3>Sources</h3><p>'+GUIDE.sources+'</p></div>';
   $('#guidebody').innerHTML=h;
 }
+/* Self-test on the frameworks: hide every formula, reveal one by tapping (or Enter/Space), toggle back. */
+$('#guidebody').addEventListener('click',function(e){
+  var g=$('#guidebody');
+  if(e.target.closest('#fw-test')){
+    var on=g.classList.toggle('recall');
+    g.querySelectorAll('.fw-f.shown').forEach(function(x){x.classList.remove('shown');});
+    $('#fw-test').textContent=on?'Show all formulas':'Test yourself: hide formulas';
+    $('#fw-hint').hidden=!on; return;
+  }
+  var f=e.target.closest('.fw-f'); if(f&&g.classList.contains('recall')) f.classList.add('shown');
+});
+$('#guidebody').addEventListener('keydown',function(e){
+  var f=e.target.closest&&e.target.closest('.fw-f');
+  if(f&&(e.key==='Enter'||e.key===' ')&&$('#guidebody').classList.contains('recall')){ e.preventDefault(); f.classList.add('shown'); }
+});
 
 renderBank(); renderQuiz(); renderNotes(); renderGuide();
 })();

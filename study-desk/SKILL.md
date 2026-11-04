@@ -12,7 +12,8 @@ you do the reading, judging and writing. You never hand-write the HTML, CSS or J
 you never retype a past paper.
 
 Tools: https://github.com/nishanth-kannan/study-desk-generator (this file needs **v2.3 or later** in the v2 line: v2.3 added
-LaTeX maths, typeset offline with KaTeX, and made the desk open on Concepts with each tab keeping its own scroll position, and collected each concept section's formulas into a "Formulas to remember" box; v2.2 added answer-format detection — unlettered options, answer boxes, printed
+LaTeX maths, typeset offline with KaTeX, and made the desk open on Concepts with each tab keeping its own scroll position, and gave formulas recall boxes
+(a "Formulas to remember" box per concept section; formula cards with a self-test mode in the quick reference); v2.2 added answer-format detection — unlettered options, answer boxes, printed
 keys and multi-part questions — past-paper examples inside concept notes, and Reveal all / Hide all toggles).
 
 ---
@@ -273,7 +274,10 @@ missing, any disputed keys, and that `work/compare.html` lets the student check 
 ```
 
 - `meta`: `title`, `subtitle`, `unitLabel`, `storageKey` (unique per course), optional `theme`.
-  `guide`: `intro`, `frameworks: [{h, x}]`, `traps: [{h, x}]`, `sources`.
+  `guide`: `intro`, `frameworks: [{h, f, x?}]`, `traps: [{h, x}]`, `sources`. A framework's `f` lists its formulas,
+  each `"formula"` or `["label", "formula"]` (e.g. `["Real interest rate", "r = i − π<sup>e</sup>"]`); each shows in its own
+  large box, and *Test yourself* hides them until tapped. `x` is an optional one-line note under the formulas.
+  Put formulas in `f`, not in `x`.
 - `a` is **zero-based**. Bank `id`s are unique. Every `unit` must be declared.
 - Paper items: `o`/`a` = MCQ; `num` (+`tol`) = numeric box(es); `sub: true` = written answer;
   `head: true` = printed text with no answer; `parts: [...]` = sub-parts, each with `label`, `q`,
