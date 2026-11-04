@@ -278,10 +278,56 @@ details.ex-ans p,details.ex-ans li{font-size:14.3px;line-height:1.6;color:var(--
 /* the paper note: only its title is a heading; bold words inside it stay inline */
 .note b{display:inline;font-family:inherit;font-size:inherit;margin:0}
 .note > b:first-child{display:block;font-family:var(--serif);font-size:16px;margin-bottom:3px}
-/* formulas inside a sentence flow with the text instead of breaking it into boxes */
-.sec p .fx,.sec li .fx,.sec dd .fx,.cbox .fx,.expl p .fx,.expl li .fx,.ex-why .fx{display:inline;margin:0;padding:1px 6px;border-left-width:2px;
+/* formulas inside an answer explanation flow with the text; concept notes and the quick reference box them (below) */
+.expl p .fx,.expl li .fx,.ex-why .fx{display:inline;margin:0;padding:1px 6px;border-left-width:2px;
   line-height:inherit;-webkit-box-decoration-break:clone;box-decoration-break:clone;white-space:normal}
 .deck{grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+/* Formulas for quick recall. In concept notes a formula (<span class='fx'>) stays in its sentence in bold, with
+   no box (a box inside a callout reads as clutter); tables are left as they are. Each concept section then
+   collects its formulas into a "Formulas to remember" box after the explanation. Derivations use the steps
+   block: one equation per line. Answer explanations and past-paper examples keep their own inline style. */
+.sec .fx,.cbox .fx,.guide .fx{display:inline;margin:0;padding:0;background:none;border:0;border-radius:0;
+  font:inherit;font-weight:700;color:var(--ink);white-space:normal}
+.sec table .fx{font-weight:inherit;color:inherit}
+.sec .expl .fx,.sec .ex-why .fx,.sec .ex-card .fx{padding:1px 6px;border:1px solid var(--line);border-left:2px solid var(--accent);border-radius:3px;
+  font-weight:inherit;background:var(--surface-2);color:var(--ink-2)}
+.steps-t{margin:14px 0 6px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+ol.steps{list-style:none;counter-reset:st;margin:0 0 16px;padding:2px 0 2px 14px;border-left:2px solid var(--line);max-width:74ch}
+ol.steps li{counter-increment:st;display:grid;grid-template-columns:minmax(140px,32%) 1fr;gap:4px 14px;align-items:baseline;
+  padding:6px 0;border-bottom:1px dashed var(--line)}
+ol.steps li:last-child{border-bottom:0}
+.st-lab{font-size:13px;line-height:1.45;color:var(--ink-3)}
+.st-lab::before{content:counter(st) ". ";font-weight:700;color:var(--accent-ink)}
+.st-eq{font-family:var(--serif);font-size:16.5px;line-height:1.5;color:var(--ink);overflow-x:auto}
+.st-eq .fx{font-weight:700}
+@media (max-width:560px){ol.steps li{grid-template-columns:1fr}}
+/* lecture figures in the notes: shown near their natural size, not stretched to the column */
+.sec figure.rx{max-width:min(100%,680px)}
+.sec .rx-fig img{display:block;width:100%;max-height:440px;object-fit:contain}
+.fxbox{margin:16px 0 4px;padding:13px 16px 14px;background:var(--surface);border:1px solid var(--line);
+  border-top:3px solid var(--accent);border-radius:var(--r);max-width:74ch}
+.fxbox h5{margin:0 0 10px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);font-weight:700}
+.fxbox-f{margin:0 0 8px;padding:9px 13px;background:var(--accent-soft);border:1px solid var(--line);border-left:4px solid var(--accent);
+  border-radius:6px;font-family:var(--serif);font-size:18px;line-height:1.45;font-weight:600;color:var(--ink);overflow-x:auto}
+.fxbox-f:last-child{margin-bottom:0}
+.fxbox-f .fx{display:inline;margin:0;padding:0;background:none;border:0;font:inherit;color:inherit}
+/* quick reference: frameworks as formula cards, with a self-test mode that hides each formula until tapped */
+.fw-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.fw-head h3{margin:0}
+.fw-hint{font-size:12.5px;color:var(--ink-3);margin:-4px 0 10px}
+.deck.fw-deck{grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.fw{display:flex;flex-direction:column;gap:10px;padding:16px 16px 14px;border-top:3px solid var(--accent)}
+.fw h4{margin:0;font-size:15px;font-weight:700;color:var(--ink)}
+.fw-row{display:flex;flex-direction:column;gap:3px}
+.fw-lab{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.fw-f{background:var(--accent-soft);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:6px;
+  padding:9px 13px;font-family:var(--serif);font-size:18px;line-height:1.45;font-weight:600;color:var(--ink);overflow-x:auto;
+  transition:filter .15s ease}
+.fw-f .fx{display:inline;margin:0;padding:0;background:none;border:0;font:inherit;color:inherit}
+.fw .fw-note{margin:0;font-size:13px;line-height:1.55;color:var(--ink-2)}
+.guide.recall .fw-f{filter:blur(7px);cursor:pointer;user-select:none}
+.guide.recall .fw-f.shown{filter:none;cursor:default;user-select:auto}
+@media (max-width:520px){.fxbox-f,.fw-f{font-size:16.5px}}
 @media (max-width:880px){.cols > div:last-child,#notesbody,.guide{max-width:none}}
 </style></head>
 <body>
@@ -724,6 +770,10 @@ function hl(html){
 }
 function blockHTML(b){
   if(b.t==='p') return b.raw ? b.x : '<p>'+hl(b.x)+'</p>';
+  if(b.t==='steps') return (b.title?'<div class="steps-t">'+b.title+'</div>':'')+'<ol class="steps">'+b.x.map(function(st){
+    var l=Array.isArray(st)?st[0]:'', e=Array.isArray(st)?st[1]:st;
+    return '<li>'+(l?'<span class="st-lab">'+hl(l)+'</span>':'<span class="st-lab"></span>')+'<span class="st-eq">'+hl(e)+'</span></li>';
+  }).join('')+'</ol>';
   if(b.t==='list') return '<ul>'+b.x.map(function(i){return '<li>'+hl(i)+'</li>'}).join('')+'</ul>';
   if(b.t==='defs') return '<dl class="dl">'+b.x.map(function(d){return '<div><dt>'+hl(d[0])+'</dt><dd>'+hl(d[1])+'</dd></div>';}).join('')+'</dl>';
   if(b.t==='table') return '<div class="scroller"><table class="nt"><thead><tr>'+b.head.map(function(h){return '<th>'+h+'</th>'}).join('')+'</tr></thead><tbody>'+
@@ -759,6 +809,18 @@ function renderNotes(){
   if(QB.some(function(q){return q.unit===curCh})) nav+='<button class="chip" data-drill="'+c.unit+'">Drill '+UL+' '+c.unit+' questions →</button>';
   nav+='</div>';
   $('#notesbody').innerHTML = body+buf+nav;
+  /* each section ends with its formulas, collected into one box for recall */
+  document.querySelectorAll('#notesbody section.sec').forEach(function(sec){
+    var seen={}, fs=[];
+    sec.querySelectorAll('.fx').forEach(function(f){
+      if(f.closest('.expl,.ex-card,.ex-why,.fxbox,table')) return;
+      var k=f.textContent.replace(/\s+/g,' ').trim(); if(!k||seen[k]) return; seen[k]=1; fs.push(f);
+    });
+    if(!fs.length) return;
+    var box=document.createElement('div'); box.className='fxbox';
+    box.innerHTML='<h5>Formulas to remember</h5>'+fs.map(function(f){return '<div class="fxbox-f">'+f.innerHTML+'</div>';}).join('');
+    var ex=sec.querySelector(':scope > .ex-card'); if(ex) sec.insertBefore(box,ex); else sec.appendChild(box);
+  });
   $('#toc').innerHTML = secs.map(function(p){return '<button data-jump="'+p[0]+'"><span>'+p[1]+'</span></button>'}).join('');
   var qn=QB.filter(function(q){return q.unit===curCh}).length;
   var done=QB.filter(function(q){return q.unit===curCh && S.rev[q.id]!=null}).length;
@@ -813,8 +875,20 @@ function renderGuide(){
     h+='</table></div></div>';
   }
   if(GUIDE.frameworks&&GUIDE.frameworks.length){
-    h+='<div><h3>'+(GUIDE.frameworksTitle||'Frameworks worth knowing cold')+'</h3><div class="deck">'+
-      GUIDE.frameworks.map(function(f){return '<div class="card"><h4>'+f.h+'</h4><p>'+f.x+'</p></div>'}).join('')+'</div></div>';
+    /* A framework lists its formulas in f: ["formula", or ["label", "formula"], ...]; x is an optional note.
+       Older desks give only x: its formulas (.fx) still get the formula-box style. */
+    var anyF=GUIDE.frameworks.some(function(f){return f.f&&f.f.length;});
+    h+='<div><div class="fw-head"><h3>'+(GUIDE.frameworksTitle||'Frameworks worth knowing cold')+'</h3>'+
+      (anyF?'<button class="btn ghost" id="fw-test">Test yourself: hide formulas</button>':'')+'</div>'+
+      (anyF?'<p class="fw-hint" id="fw-hint" hidden>Say each formula from memory, then tap its box to check.</p>':'')+
+      '<div class="deck fw-deck">'+
+      GUIDE.frameworks.map(function(f){
+        var rows=(f.f||[]).map(function(r){
+          var lab=Array.isArray(r)?r[0]:'', fx=Array.isArray(r)?r[1]:r;
+          return '<div class="fw-row">'+(lab?'<span class="fw-lab">'+lab+'</span>':'')+'<div class="fw-f" tabindex="0">'+fx+'</div></div>';
+        }).join('');
+        return '<div class="card fw"><h4>'+f.h+'</h4>'+rows+(f.x?'<p class="fw-note">'+f.x+'</p>':'')+'</div>';
+      }).join('')+'</div></div>';
   }
   if(GUIDE.traps&&GUIDE.traps.length){
     h+='<div><h3>'+(GUIDE.trapsTitle||'Traps the past papers keep setting')+'</h3>'+
@@ -823,6 +897,21 @@ function renderGuide(){
   if(GUIDE.sources) h+='<div><h3>Sources</h3><p>'+GUIDE.sources+'</p></div>';
   $('#guidebody').innerHTML=h;
 }
+/* Self-test on the frameworks: hide every formula, reveal one by tapping (or Enter/Space), toggle back. */
+$('#guidebody').addEventListener('click',function(e){
+  var g=$('#guidebody');
+  if(e.target.closest('#fw-test')){
+    var on=g.classList.toggle('recall');
+    g.querySelectorAll('.fw-f.shown').forEach(function(x){x.classList.remove('shown');});
+    $('#fw-test').textContent=on?'Show all formulas':'Test yourself: hide formulas';
+    $('#fw-hint').hidden=!on; return;
+  }
+  var f=e.target.closest('.fw-f'); if(f&&g.classList.contains('recall')) f.classList.add('shown');
+});
+$('#guidebody').addEventListener('keydown',function(e){
+  var f=e.target.closest&&e.target.closest('.fw-f');
+  if(f&&(e.key==='Enter'||e.key===' ')&&$('#guidebody').classList.contains('recall')){ e.preventDefault(); f.classList.add('shown'); }
+});
 
 renderBank(); renderQuiz(); renderNotes(); renderGuide();
 })();
