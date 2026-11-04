@@ -284,12 +284,23 @@ details.ex-ans p,details.ex-ans li{font-size:14.3px;line-height:1.6;color:var(--
 .deck{grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
 /* Formulas for quick recall. In concept notes a formula (<span class='fx'>) stays in its sentence in bold, with
    no box (a box inside a callout reads as clutter); tables are left as they are. Each concept section then
-   collects its formulas into a "Formulas to remember" box after the explanation. Answer explanations and past-paper examples keep their own inline style. */
+   collects its formulas into a "Formulas to remember" box after the explanation. Derivations use the steps
+   block: one equation per line. Answer explanations and past-paper examples keep their own inline style. */
 .sec .fx,.cbox .fx,.guide .fx{display:inline;margin:0;padding:0;background:none;border:0;border-radius:0;
   font:inherit;font-weight:700;color:var(--ink);white-space:normal}
 .sec table .fx{font-weight:inherit;color:inherit}
 .sec .expl .fx,.sec .ex-why .fx,.sec .ex-card .fx{padding:1px 6px;border:1px solid var(--line);border-left:2px solid var(--accent);border-radius:3px;
   font-weight:inherit;background:var(--surface-2);color:var(--ink-2)}
+.steps-t{margin:14px 0 6px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+ol.steps{list-style:none;counter-reset:st;margin:0 0 16px;padding:2px 0 2px 14px;border-left:2px solid var(--line);max-width:74ch}
+ol.steps li{counter-increment:st;display:grid;grid-template-columns:minmax(140px,32%) 1fr;gap:4px 14px;align-items:baseline;
+  padding:6px 0;border-bottom:1px dashed var(--line)}
+ol.steps li:last-child{border-bottom:0}
+.st-lab{font-size:13px;line-height:1.45;color:var(--ink-3)}
+.st-lab::before{content:counter(st) ". ";font-weight:700;color:var(--accent-ink)}
+.st-eq{font-family:var(--serif);font-size:16.5px;line-height:1.5;color:var(--ink);overflow-x:auto}
+.st-eq .fx{font-weight:700}
+@media (max-width:560px){ol.steps li{grid-template-columns:1fr}}
 .fxbox{margin:16px 0 4px;padding:13px 16px 14px;background:var(--surface);border:1px solid var(--line);
   border-top:3px solid var(--accent);border-radius:var(--r);max-width:74ch}
 .fxbox h5{margin:0 0 10px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);font-weight:700}
@@ -756,6 +767,10 @@ function hl(html){
 }
 function blockHTML(b){
   if(b.t==='p') return b.raw ? b.x : '<p>'+hl(b.x)+'</p>';
+  if(b.t==='steps') return (b.title?'<div class="steps-t">'+b.title+'</div>':'')+'<ol class="steps">'+b.x.map(function(st){
+    var l=Array.isArray(st)?st[0]:'', e=Array.isArray(st)?st[1]:st;
+    return '<li>'+(l?'<span class="st-lab">'+hl(l)+'</span>':'<span class="st-lab"></span>')+'<span class="st-eq">'+hl(e)+'</span></li>';
+  }).join('')+'</ol>';
   if(b.t==='list') return '<ul>'+b.x.map(function(i){return '<li>'+hl(i)+'</li>'}).join('')+'</ul>';
   if(b.t==='defs') return '<dl class="dl">'+b.x.map(function(d){return '<div><dt>'+hl(d[0])+'</dt><dd>'+hl(d[1])+'</dd></div>';}).join('')+'</dl>';
   if(b.t==='table') return '<div class="scroller"><table class="nt"><thead><tr>'+b.head.map(function(h){return '<th>'+h+'</th>'}).join('')+'</tr></thead><tbody>'+

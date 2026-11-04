@@ -28,7 +28,7 @@ BASE = Path(".")
 WARN = []
 VERSION = (HERE / "VERSION").read_text().strip() if (HERE / "VERSION").exists() else "dev"
 DIFFS = {"E", "M", "H"}
-BLOCK_TYPES = {"h", "p", "list", "defs", "table", "box", "fig", "pre", "flow", "cpm", "chart", "gantt", "ex"}
+BLOCK_TYPES = {"h", "p", "list", "steps", "defs", "table", "box", "fig", "pre", "flow", "cpm", "chart", "gantt", "ex"}
 SECTION_ALIASES = {"concepts": "concepts", "concept": "concepts", "notes": "concepts", "theory": "concepts",
     "questions": "questions", "question": "questions", "quiz": "questions", "bank": "questions", "mcq": "questions", "mcqs": "questions",
     "papers": "papers", "paper": "papers", "pyq": "papers", "pyqs": "papers", "past": "papers", "past-papers": "papers",
@@ -290,9 +290,13 @@ def r_simple(b, where):
     if t == "p": return f"<p>{b['x']}</p>"
     if t == "list": return "<ul>" + "".join(f"<li>{i}</li>" for i in b["x"]) + "</ul>"
     if t == "box": return f"<div class='cbox'><h4>{b.get('title','')}</h4><p>{b['x']}</p></div>"
+    if t == "steps":
+        rows = "".join(f"<li><span class='st-lab'>{st[0] if isinstance(st, list) else ''}</span>"
+                       f"<span class='st-eq'>{st[1] if isinstance(st, list) else st}</span></li>" for st in b["x"])
+        return (f"<div class='steps-t'>{b['title']}</div>" if b.get("title") else "") + f"<ol class='steps'>{rows}</ol>"
 
 RENDER = {"table": r_table, "fig": r_fig, "pre": r_pre, "flow": r_flow, "cpm": r_cpm,
-          "chart": r_chart, "gantt": r_gantt, "p": r_simple, "list": r_simple, "box": r_simple}
+          "chart": r_chart, "gantt": r_gantt, "p": r_simple, "list": r_simple, "steps": r_simple, "box": r_simple}
 RICH_IN_NOTES = {"fig", "pre", "flow", "cpm", "chart", "gantt"}
 
 def render_blocks(blocks, where):

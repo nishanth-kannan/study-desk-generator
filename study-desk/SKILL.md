@@ -13,7 +13,8 @@ you never retype a past paper.
 
 Tools: https://github.com/nishanth-kannan/study-desk-generator (this file needs **v2.3 or later** in the v2 line: v2.3 added
 LaTeX maths, typeset offline with KaTeX, and made the desk open on Concepts with each tab keeping its own scroll position, and gave formulas recall boxes
-(a "Formulas to remember" box per concept section; formula cards with a self-test mode in the quick reference); v2.2 added answer-format detection — unlettered options, answer boxes, printed
+(a "Formulas to remember" box per concept section; formula cards with a self-test mode in the quick reference)
+and a `steps` block for derivations; v2.2 added answer-format detection — unlettered options, answer boxes, printed
 keys and multi-part questions — past-paper examples inside concept notes, and Reveal all / Hide all toggles).
 
 ---
@@ -190,8 +191,11 @@ the recurring question shapes. **Mark every formula a student should recall** wi
 (identities, multipliers, curve equations; not worked numbers, not inside tables): it shows in bold in its
 sentence, and the desk collects each section's formulas into a *Formulas to remember* box after its explanation.
 Check every block for formulas, including ones written with `<sub>`/`<sup>`. Mark each formula once: don't mark a
-rearranged copy of the same identity. Figures come from the readings or official solutions.
+rearranged copy of the same identity.
 
+**Never write a derivation as a paragraph.** Use a `steps` block, one equation per step, with a short label
+saying what the step does: `{"t": "steps", "title": "Deriving the IS curve", "x": [["Goods market clears",
+"Y = α<sub>G</sub>(Ā − bi)"], ["Solve for i", "i = Ā/b − Y/(α<sub>G</sub>b)"]]}`. Mark the result `fx`. Figures come from the readings or official solutions.
 
 **Past-paper examples (when papers are in the desk).** Under each section a past paper tests, add
 `{"t": "ex", "paper": "<id>", "n": <n>, "part": "g)", "why": "<one line: what this shows>"}`
@@ -327,6 +331,7 @@ shows as a caveat.
 
 | `t` | Fields |
 |---|---|
+| `steps` | a derivation: `x=[[label, equation], …]` (or plain equations), optional `title` |
 | `h`, `p`, `list`, `defs`, `box` | notes blocks: `x` (`defs`: `[[term, definition], …]`; `box` needs `title`) |
 | `table` | `head`, `rows` (each row as long as `head`), optional `groups=[[label, span], …]`, `title`, `caption`, `note` |
 | `flow` | process/precedence diagrams: `nodes=[{id, label ("\n" breaks), col, row, shape: task/store/decision/terminal, sub, hl}]`, `edges=[[from, to, label?]]`, `colw`, `rowh`, `boxw` |
@@ -362,7 +367,7 @@ has, pin another.
   key or option to check against).
 - Piling questions into a few units (check the coverage line and rebalance); obvious distractors;
   explanations that just restate the right option.
-- Formulas left unmarked in concept notes.
+- Derivations written as prose instead of a `steps` block; formulas left unmarked.
 - Concept notes with no past-paper examples when papers are in the desk, or examples typed into a
   `p` block instead of an `ex` block.
 - Shipping an answer key you didn't verify; building sections the student didn't ask for.
