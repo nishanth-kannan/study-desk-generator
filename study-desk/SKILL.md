@@ -195,7 +195,12 @@ rearranged copy of the same identity.
 
 **Never write a derivation as a paragraph.** Use a `steps` block, one equation per step, with a short label
 saying what the step does: `{"t": "steps", "title": "Deriving the IS curve", "x": [["Goods market clears",
-"Y = α<sub>G</sub>(Ā − bi)"], ["Solve for i", "i = Ā/b − Y/(α<sub>G</sub>b)"]]}`. Mark the result `fx`. Figures come from the readings or official solutions.
+"Y = α<sub>G</sub>(Ā − bi)"], ["Solve for i", "i = Ā/b − Y/(α<sub>G</sub>b)"]]}`. Mark the result `fx`.
+
+**Diagrams from the readings.** When a reading teaches through diagrams (curve shifts, equilibria, cross
+diagrams), put them in the notes next to the explanation they illustrate: crop just the diagram from the
+`work/view/` figure crops (not the slide text) into `figures/`, add a `fig` block with a one-line `caption`
+saying what the diagram shows, and view the crops on a contact sheet before using them. Figures come from the readings or official solutions.
 
 **Past-paper examples (when papers are in the desk).** Under each section a past paper tests, add
 `{"t": "ex", "paper": "<id>", "n": <n>, "part": "g)", "why": "<one line: what this shows>"}`
@@ -367,7 +372,7 @@ has, pin another.
   key or option to check against).
 - Piling questions into a few units (check the coverage line and rebalance); obvious distractors;
   explanations that just restate the right option.
-- Derivations written as prose instead of a `steps` block; formulas left unmarked.
+- Derivations written as prose instead of a `steps` block; formulas left unmarked; lecture diagrams left out of the notes.
 - Concept notes with no past-paper examples when papers are in the desk, or examples typed into a
   `p` block instead of an `ex` block.
 - Shipping an answer key you didn't verify; building sections the student didn't ask for.

@@ -301,6 +301,9 @@ ol.steps li:last-child{border-bottom:0}
 .st-eq{font-family:var(--serif);font-size:16.5px;line-height:1.5;color:var(--ink);overflow-x:auto}
 .st-eq .fx{font-weight:700}
 @media (max-width:560px){ol.steps li{grid-template-columns:1fr}}
+/* lecture figures in the notes: shown near their natural size, not stretched to the column */
+.sec figure.rx{max-width:min(100%,680px)}
+.sec .rx-fig img{display:block;width:100%;max-height:440px;object-fit:contain}
 .fxbox{margin:16px 0 4px;padding:13px 16px 14px;background:var(--surface);border:1px solid var(--line);
   border-top:3px solid var(--accent);border-radius:var(--r);max-width:74ch}
 .fxbox h5{margin:0 0 10px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);font-weight:700}
