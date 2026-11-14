@@ -39,6 +39,18 @@ def desk(path):
                 if y > 0 and abs(pg.evaluate("Math.round(scrollY)") - y) > 2:
                     fails.append(f"[{scheme}] {a.inner_text().strip()} tab lost its scroll position after switching tabs")
                 pg.evaluate("window.scrollTo(0, 0)")
+            if width <= 880:                                            # phones: the masthead scrolls away with the page
+                pg.evaluate("window.scrollTo(0, Math.min(600, document.documentElement.scrollHeight - innerHeight))")
+                pg.wait_for_timeout(80)
+                if pg.evaluate("scrollY > 200 && document.querySelector('.top').getBoundingClientRect().bottom > 0"):
+                    fails.append(f"[{scheme}] the header stays frozen on screen at {width}px")
+                pg.evaluate("window.scrollTo(0, 0)")
+            if pg.locator("#view-notes").is_visible() and pg.locator("#tocbox").count():   # "On this page" folds and unfolds
+                was = pg.evaluate("document.getElementById('tocbox').open")
+                pg.locator("#tocbox summary").click(); pg.wait_for_timeout(60)
+                if pg.evaluate("document.getElementById('tocbox').open") == was:
+                    fails.append(f"[{scheme}] 'On this page' does not collapse")
+                pg.locator("#tocbox summary").click(); pg.wait_for_timeout(60)
             for tab in shown:
                 tab.click(); pg.wait_for_timeout(150); tabs += 1
                 label = tab.inner_text().strip()
